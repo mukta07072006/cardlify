@@ -5,13 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { CreditCard, Loader2, ArrowLeft, Sparkles, User, Mail, Lock } from 'lucide-react';
+import { ArrowLeft, Loader2, Sparkles, User, Mail, Lock } from 'lucide-react';
 import { z } from 'zod';
 
 const authSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  name: z.string().min(2, 'Name must be at least 2 characters').optional(),
+  email: z.string().email('INVALID_EMAIL'),
+  password: z.string().min(6, 'MIN_6_CHARS'),
+  name: z.string().min(2, 'MIN_2_CHARS').optional(),
 });
 
 export default function Auth() {
@@ -29,6 +29,7 @@ export default function Auth() {
     if (user) {
       navigate('/dashboard');
     }
+    document.fonts.load('10pt "Press Start 2P"');
   }, [user, navigate]);
 
   const validateForm = () => {
@@ -56,36 +57,24 @@ export default function Auth() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!validateForm()) return;
-    
     setLoading(true);
 
     try {
       if (isLogin) {
         const { error } = await signIn(email, password);
         if (error) {
-          if (error.message.includes('Invalid login credentials')) {
-            toast.error('Invalid email or password. Please try again.');
-          } else if (error.message.includes('Email not confirmed')) {
-            toast.error('Please verify your email before signing in.');
-          } else {
-            toast.error(error.message);
-          }
+          toast.error(error.message);
         } else {
-          toast.success('Welcome back!');
+          toast.success('SYSTEM_READY: ACCESS_GRANTED');
           navigate('/dashboard');
         }
       } else {
         const { error } = await signUp(email, password, name);
         if (error) {
-          if (error.message.includes('already registered')) {
-            toast.error('This email is already registered. Please sign in instead.');
-          } else {
-            toast.error(error.message);
-          }
+          toast.error(error.message);
         } else {
-          toast.success('Account created! Please check your email to verify your account.');
+          toast.success('ACCOUNT_CREATED: VERIFY_EMAIL');
           setIsLogin(true);
         }
       }
@@ -95,177 +84,180 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen w-full relative bg-stone-50 text-stone-900 selection:bg-rose-100 flex items-center justify-center p-4 overflow-x-hidden">
-      {/* Import Fancy Font */}
+    <div className="min-h-screen w-full relative bg-[#f4f4f0] text-black font-mono uppercase flex items-center justify-center p-4 overflow-x-hidden">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&display=swap');
-        .font-fancy { font-family: 'Playfair Display', serif; }
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        .font-pixel { font-family: 'Press Start 2P', cursive; }
         
-        @keyframes float {
-          0%, 100% { transform: translateY(0px) rotate(3deg); }
-          50% { transform: translateY(-15px) rotate(6deg); }
+        .pixel-card {
+          background: white;
+          border: 4px solid black;
+          box-shadow: 12px 12px 0px 0px rgba(0,0,0,1);
         }
-        .animate-float { animation: float 6s ease-in-out infinite; }
+
+        .pixel-btn-black {
+          background: black;
+          color: white;
+          border: 4px solid black;
+          box-shadow: 4px 4px 0px 0px #f43f5e;
+          transition: all 0.1s;
+        }
+        .pixel-btn-black:active {
+          transform: translate(2px, 2px);
+          box-shadow: 0px 0px 0px 0px black;
+        }
+
+        .pixel-input {
+          border: 4px solid black !important;
+          background: #fdfdfd !important;
+          border-radius: 0 !important;
+          font-family: 'Press Start 2P', cursive;
+          font-size: 8px !important;
+        }
+
+        @keyframes step-float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+        }
+        .animate-step-float { animation: step-float 4s steps(4) infinite; }
+
+        .bg-grid {
+          background-size: 40px 40px;
+          background-image: radial-gradient(circle, #000 1px, transparent 1px);
+          opacity: 0.1;
+        }
       `}</style>
 
-      {/* Global Grain Overlay */}
-      <div className="fixed inset-0 pointer-events-none opacity-[0.15] mix-blend-multiply bg-[url('https://www.transparenttextures.com/patterns/handmade-paper.png')] z-[60]" />
-
-      {/* Abstract Background Blobs */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-         <div className="absolute top-[-10%] left-[-5%] w-[600px] h-[600px] bg-rose-200/40 rounded-full blur-[100px] animate-pulse" />
-         <div className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] bg-stone-200/60 rounded-full blur-[100px]" />
-      </div>
+      {/* Pixelated Background Elements */}
+      <div className="fixed inset-0 bg-grid z-0" />
+      <div className="fixed top-20 right-20 w-32 h-32 bg-rose-500/10 border-4 border-black -rotate-12 z-0" />
+      <div className="fixed bottom-20 left-20 w-24 h-24 bg-black/5 border-4 border-black rotate-12 z-0" />
 
       {/* Back to Home Link */}
-      <Link to="/" className="absolute top-8 left-8 z-50 flex items-center gap-2 text-stone-500 hover:text-stone-900 transition-colors font-medium">
+      <Link to="/" className="absolute top-8 left-8 z-50 flex items-center gap-2 text-black hover:text-rose-500 transition-colors font-pixel text-[8px]">
         <ArrowLeft className="w-4 h-4" />
-        <span className="text-sm tracking-wide">Back to Home</span>
+        <span>BACK_TO_HOME</span>
       </Link>
 
       {/* Main Container */}
-      <div className="w-full max-w-[1000px] grid lg:grid-cols-2 gap-8 items-center relative z-10">
+      <div className="w-full max-w-[1000px] grid lg:grid-cols-2 gap-16 items-center relative z-10">
         
-        {/* Left Side: Visual/Branding (Hidden on mobile) */}
-        <div className="hidden lg:flex flex-col justify-center items-start space-y-8 pr-12">
+        {/* Left Side: Visual/Branding */}
+        <div className="hidden lg:flex flex-col justify-center items-start space-y-12">
             <div className="relative">
-                <div className="relative z-10 bg-white p-4 rounded-3xl shadow-2xl border-[8px] border-white animate-float rotate-3 max-w-[280px]">
+                <div className="relative z-10 bg-white p-2 border-4 border-black shadow-[10px_10px_0px_0px_#f43f5e] animate-step-float max-w-[280px]">
                     <img 
                         src="https://images.unsplash.com/photo-1542598953-41310c43f54b?q=80&w=2070&auto=format&fit=crop" 
                         alt="Visual" 
-                        className="rounded-2xl w-full h-auto object-cover aspect-[3/4]"
+                        className="w-full h-auto object-cover aspect-[3/4] grayscale contrast-125"
                     />
-                    <div className="absolute -bottom-6 -right-6 bg-stone-900 text-white p-4 rounded-2xl shadow-lg flex items-center gap-3">
-                        <Sparkles className="w-5 h-5 text-rose-400" />
-                        <span className="font-bold text-sm">Join 2k+ Creators</span>
+                    <div className="absolute -bottom-6 -right-6 bg-black text-white p-3 border-4 border-white shadow-lg flex items-center gap-3">
+                        <Sparkles className="w-4 h-4 text-rose-500" />
+                        <span className="font-pixel text-[7px]">2K_USERS_ACTIVE</span>
                     </div>
                 </div>
-                {/* Decorative background shape behind image */}
-                <div className="absolute top-10 left-10 w-full h-full bg-rose-100 rounded-[2.5rem] -z-10 rotate-6" />
             </div>
 
-            <div className="pt-8">
-                <h2 className="font-fancy text-5xl font-bold leading-tight text-stone-900">
-                    Your studio <br/>
-                    <span className="italic text-rose-500">awaiting.</span>
+            <div className="space-y-6">
+                <h2 className="font-pixel text-3xl leading-tight text-black">
+                    STUDIO_<br/>
+                    <span className="text-rose-500 italic">ACCESS.</span>
                 </h2>
-                <p className="mt-4 text-stone-500 text-lg max-w-xs leading-relaxed">
-                    Create, manage, and distribute thousands of ID cards in minutes.
+                <p className="text-stone-500 font-pixel text-[8px] max-w-xs leading-loose">
+                    &gt; INITIALIZING_ID_GENERATOR...<br/>
+                    &gt; MINT_CARDS_IN_SECONDS.
                 </p>
             </div>
         </div>
 
         {/* Right Side: Auth Form */}
         <div className="w-full max-w-md mx-auto">
-            <div className="bg-white/80 backdrop-blur-xl border border-white/50 shadow-xl shadow-stone-200/50 rounded-[2.5rem] p-8 md:p-10 relative overflow-hidden">
+            <div className="pixel-card p-8 md:p-10 relative overflow-hidden">
                 
                 {/* Form Header */}
                 <div className="text-center mb-10 relative z-10">
-                    <div className="inline-flex items-center justify-center w-14 h-14 bg-rose-500 rounded-2xl shadow-lg shadow-rose-200 mb-6 rotate-[-6deg] hover:rotate-0 transition-transform duration-300">
+                    <div className="inline-flex items-center justify-center w-auto h-auto mb-6">
                         <img 
                           src="/cardlify.png" 
-                          alt="Cardlify Logo" 
-                          className="w-7 h-7 object-contain"
+                          alt="Logo" 
+                          className="w-40 h-auto object-contain"
                         />
                     </div>
-                    <h1 className="font-fancy text-3xl font-bold text-stone-900 mb-2">
-                        {isLogin ? 'Welcome back' : 'Start crafting'}
+                    <h1 className="font-pixel text-lg text-black mb-4 uppercase">
+                        {isLogin ? 'USER_SIGN_IN' : 'CREATE_ID'}
                     </h1>
-                    <p className="text-stone-500 text-sm">
-                        {isLogin ? 'Enter your details to access your workspace.' : 'Create your account to get started.'}
-                    </p>
+                    <div className="h-1 w-20 bg-black mx-auto mb-4" />
                 </div>
 
                 {/* The Form */}
-                <form onSubmit={handleSubmit} className="space-y-5 relative z-10">
+                <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
                     
                     {!isLogin && (
-                        <div className="space-y-1.5">
-                            <Label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-stone-400 ml-1">Full Name</Label>
+                        <div className="space-y-2">
+                            <Label className="font-pixel text-[7px] text-stone-400">FULL_NAME</Label>
                             <div className="relative">
-                                <User className="absolute left-4 top-3.5 h-5 w-5 text-stone-400" />
+                                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
                                 <Input
-                                    id="name"
-                                    placeholder=" Your Name"
+                                    placeholder="TYPE_NAME..."
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
-                                    disabled={loading}
-                                    className="pl-12 h-12 rounded-xl bg-stone-50 border-stone-200 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-medium text-stone-800"
+                                    className="pixel-input pl-10 h-12"
                                 />
                             </div>
-                            {errors.name && <p className="text-xs text-rose-500 font-medium ml-1">{errors.name}</p>}
                         </div>
                     )}
 
-                    <div className="space-y-1.5">
-                        <Label htmlFor="email" className="text-xs font-bold uppercase tracking-wider text-stone-400 ml-1">Email Address</Label>
+                    <div className="space-y-2">
+                        <Label className="font-pixel text-[7px] text-stone-400">EMAIL_ADDRESS</Label>
                         <div className="relative">
-                            <Mail className="absolute left-4 top-3.5 h-5 w-5 text-stone-400" />
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
                             <Input
-                                id="email"
                                 type="email"
-                                placeholder="you@example.com"
+                                placeholder="USER@DOMAIN.COM"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                disabled={loading}
-                                className="pl-12 h-12 rounded-xl bg-stone-50 border-stone-200 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-medium text-stone-800"
+                                className="pixel-input pl-10 h-12"
                             />
                         </div>
-                        {errors.email && <p className="text-xs text-rose-500 font-medium ml-1">{errors.email}</p>}
+                        {errors.email && <p className="font-pixel text-[6px] text-rose-500">{errors.email}</p>}
                     </div>
 
-                    <div className="space-y-1.5">
-                        <Label htmlFor="password" className="text-xs font-bold uppercase tracking-wider text-stone-400 ml-1">Password</Label>
+                    <div className="space-y-2">
+                        <Label className="font-pixel text-[7px] text-stone-400">SECURITY_KEY</Label>
                         <div className="relative">
-                            <Lock className="absolute left-4 top-3.5 h-5 w-5 text-stone-400" />
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
                             <Input
-                                id="password"
                                 type="password"
-                                placeholder="••••••••"
+                                placeholder="********"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                disabled={loading}
-                                className="pl-12 h-12 rounded-xl bg-stone-50 border-stone-200 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-medium text-stone-800"
+                                className="pixel-input pl-10 h-12"
                             />
                         </div>
-                        {errors.password && <p className="text-xs text-rose-500 font-medium ml-1">{errors.password}</p>}
                     </div>
 
                     <Button 
                         type="submit" 
                         disabled={loading}
-                        className="w-full h-12 rounded-xl bg-stone-900 hover:bg-stone-800 text-white font-bold shadow-lg shadow-stone-900/20 hover:shadow-xl hover:shadow-stone-900/30 transition-all duration-300 mt-2"
+                        className="w-full h-14 rounded-none font-pixel text-[9px] pixel-btn-black uppercase"
                     >
-                        {loading ? (
-                            <div className="flex items-center justify-center gap-2">
-                                <Loader2 className="w-4 h-4 animate-spin text-stone-400" />
-                                <span>Processing...</span>
-                            </div>
-                        ) : (
-                            isLogin ? 'Sign In' : 'Create Account'
-                        )}
+                        {loading ? 'PROCESSING...' : (isLogin ? 'LOGIN_NOW' : 'MINT_ACCOUNT')}
                     </Button>
                 </form>
 
-                {/* Footer / Toggle */}
-                <div className="mt-8 pt-6 border-t border-stone-100 text-center relative z-10">
-                    <p className="text-stone-500 text-sm">
-                        {isLogin ? "New to Cardlify?" : "Already have an account?"}
-                    </p>
+                {/* Toggle Link */}
+                <div className="mt-10 pt-6 border-t-4 border-stone-100 text-center relative z-10">
                     <button
                         type="button"
                         onClick={() => {
                             setIsLogin(!isLogin);
                             setErrors({});
                         }}
-                        className="mt-2 text-base font-bold text-stone-900 hover:text-rose-500 transition-colors font-fancy underline underline-offset-4 decoration-stone-200 hover:decoration-rose-300"
+                        className="font-pixel text-[8px] text-black hover:text-rose-500 transition-colors uppercase underline underline-offset-8"
                     >
-                        {isLogin ? "Create an account" : "Sign in to account"}
+                        {isLogin ? "NEW_ENTRY?_REGISTER" : "HAVE_ID?_SIGN_IN"}
                     </button>
                 </div>
-
-                {/* Decorative sheen inside the card */}
-                <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 bg-gradient-to-br from-rose-50/50 to-transparent rounded-full blur-2xl pointer-events-none" />
             </div>
         </div>
       </div>
