@@ -53,7 +53,7 @@ export default function Index() {
       <SharedHeader />
 
       {/* Hero Section */}
-      <section className="relative z-10 pt-4 pb-12 px-8 max-w-7xl mx-auto">
+      <section className="relative z-10 pt-4 pb-12 px-4 sm:px-8 max-w-7xl mx-auto">
         <div className="grid lg:grid-cols-[0.7fr_1.3fr] gap-12 items-center">
           
           <div className="relative h-[320px] hidden lg:flex items-center justify-center">
@@ -77,7 +77,7 @@ export default function Index() {
             </p>
 
             <div className="flex items-center gap-5 pt-4">
-                <Button size="lg" className="bg-rose-500 hover:bg-rose-600 text-white px-8 py-6 text-lg rounded-none border-b-8 border-rose-800 active:border-b-0 active:translate-y-2 transition-all font-pixel text-xs">
+                <Button size="lg" className="bg-rose-500 hover:bg-rose-600 text-white px-4 md:px-8 py-2 md:py-6 text-sm md:text-lg rounded-none border-b-8 border-rose-800 active:border-b-0 active:translate-y-2 transition-all font-pixel">
                   START CREATING
                 </Button>
                 <div className="flex -space-x-3">
@@ -94,9 +94,9 @@ export default function Index() {
       </section>
 
       {/* Features Grid */}
-      <section className="relative pt-24 pb-12 px-8 overflow-hidden bg-stone-100 border-y-4 border-black">
+      <section className="relative pt-24 pb-12 px-4 sm:px-8 overflow-hidden bg-stone-100 border-y-4 border-black">
         <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-3 gap-8 mb-32">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8 mb-32">
             {[
               { icon: PenTool, title: "Bulk Card Generation", desc: "Generate hundreds of personalized cards automatically using a single design template. No need to manually edit each photo and name — our system creates all cards in seconds." },
               { icon: Share2, title: "Simple Link-Based Collection", desc: "Share one link with your members. They upload their photo and details themselves, and the system instantly turns that information into a professional card." },
@@ -115,7 +115,7 @@ export default function Index() {
       </section>
 
       {/* Contributors Section */}
-      <section className="py-24 px-8 bg-white">
+      <section className="py-24 px-4 sm:px-8 bg-white">
         <div className="max-w-7xl mx-auto">
           <div className="mb-12 text-center">
             <h2 className="font-pixel text-2xl font-bold text-stone-900 underline decoration-rose-500 underline-offset-8">
@@ -126,7 +126,7 @@ export default function Index() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-6 border-t-4 border-black pt-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-6 border-t-4 border-black pt-8">
             {[
               { rank: 1, name: "Salim Ullah", count: 2450 },
               { rank: 2, name: "Yasmin Akhter", count: 1980 },
@@ -135,7 +135,7 @@ export default function Index() {
               { rank: 5, name: "Get Together", count: 1280 },
               { rank: 6, name: "Fahim Ahmed", count: 1150 }
             ].map((user, i) => (
-              <div key={i} className="flex items-center justify-between py-4 border-b-2 border-stone-100 hover:bg-rose-50 px-2 transition-all">
+              <div key={i} className="flex flex-col sm:flex-row items-start sm:items-center sm:justify-between py-4 border-b-2 border-stone-100 hover:bg-rose-50 px-2 transition-all">
                 <div className="flex items-center gap-4">
                   <span className={`font-pixel text-[10px] w-8 ${i < 3 ? 'text-rose-500' : 'text-stone-300'}`}>
                     {user.rank.toString().padStart(2, '0')}
@@ -153,7 +153,7 @@ export default function Index() {
       </section>
 
       {/* How It Works Section */}
-      <section className="relative py-32 px-8 bg-stone-100 border-t-4 border-black overflow-hidden">
+      <section className="relative py-32 px-4 sm:px-8 bg-stone-100 border-t-4 border-black overflow-hidden">
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-20">
             <span className="inline-block py-2 px-4 border-2 border-black bg-white text-[10px] font-pixel text-rose-500 mb-6 shadow-[4px_4px_0px_0px_black]">
@@ -167,13 +167,13 @@ export default function Index() {
 
           <Tabs defaultValue="organizers" className="max-w-5xl mx-auto">
             <div className="flex justify-center mb-16">
-              <TabsList className="grid w-full max-w-md grid-cols-2 h-16 bg-white border-4 border-black shadow-[8px_8px_0px_0px_black] p-1 rounded-none">
-                <TabsTrigger value="organizers" className="text-[10px] font-pixel data-[state=active]:bg-rose-500 data-[state=active]:text-white rounded-none">ORGANIZERS</TabsTrigger>
-                <TabsTrigger value="participants" className="text-[10px] font-pixel data-[state=active]:bg-rose-500 data-[state=active]:text-white rounded-none">PARTICIPANTS</TabsTrigger>
+              <TabsList className="grid w-full max-w-md grid-cols-1 sm:grid-cols-2 h-12 sm:h-16 bg-white border-4 border-black shadow-[8px_8px_0px_0px_black] p-1 rounded-none">
+                <TabsTrigger value="organizers" className="h-12 sm:h-16 flex items-center justify-center text-sm sm:text-[10px] font-pixel data-[state=active]:bg-rose-500 data-[state=active]:text-white rounded-none">ORGANIZERS</TabsTrigger>
+                <TabsTrigger value="participants" className="h-12 sm:h-16 flex items-center justify-center text-sm sm:text-[10px] font-pixel data-[state=active]:bg-rose-500 data-[state=active]:text-white rounded-none">PARTICIPANTS</TabsTrigger>
               </TabsList>
             </div>
             
-            <TabsContent value="organizers" className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
+            <TabsContent value="organizers" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
               {[
                 { step: "01", title: "Create Project", desc: "Sign up and start a new project. Upload your own template or pick from our curated gallery." },
                 { step: "02", title: "Set Layout", desc: "Drag & drop dynamic fields like Name, Photo, and ID. Lock the design to ensure consistency." },
@@ -189,7 +189,7 @@ export default function Index() {
               ))}
             </TabsContent>
             
-            <TabsContent value="participants" className="grid md:grid-cols-3 gap-6 animate-in fade-in duration-500">
+            <TabsContent value="participants" className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-500">
               {[
                 { step: "01", title: "Open Link", desc: "Click the secure link shared by your organizer. No account creation required." },
                 { step: "02", title: "Submit Details", desc: "Upload your photo and fill in your details. Preview your card in real-time." },
@@ -207,7 +207,7 @@ export default function Index() {
       </section>
 
       {/* FAQ Section */}
-      <section className="relative py-32 px-8 bg-white border-t-4 border-black">
+      <section className="relative py-32 px-4 sm:px-8 bg-white border-t-4 border-black">
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="font-pixel text-3xl font-bold mb-4 text-stone-900">FAQ</h2>
@@ -232,7 +232,7 @@ export default function Index() {
               <AccordionItem 
                 key={i} 
                 value={`item-${i}`} 
-                className="bg-white border-4 border-black px-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,0.05)] rounded-none"
+                className="bg-white border-4 border-black px-4 sm:px-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,0.05)] rounded-none"
               >
                 <AccordionTrigger className="text-sm font-pixel hover:no-underline text-left py-6">
                   <span className="flex gap-4">
@@ -240,7 +240,7 @@ export default function Index() {
                     {faq.q}
                   </span>
                 </AccordionTrigger>
-                <AccordionContent className="text-stone-600 font-pixel-mono text-lg leading-relaxed pb-6 pl-10">
+                <AccordionContent className="text-stone-600 font-pixel-mono text-lg leading-relaxed pb-6 pl-4 sm:pl-10">
                   {faq.a}
                 </AccordionContent>
               </AccordionItem>

@@ -4,6 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Search, Download, Loader2, ArrowRight, Heart, Sparkles } from 'lucide-react';
+import { useUserRole } from '@/hooks/useUserRole';
+import { Instagram } from 'lucide-react'; 
+import { motion } from 'framer-motion';
 
 interface LovelyPerson {
   id: number;
@@ -15,6 +18,10 @@ export default function LovelyPeople() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [processingId, setProcessingId] = useState<number | null>(null);
+  const { isAdmin } = useUserRole();
+  const [showAdd, setShowAdd] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     fetchPeople();
@@ -35,6 +42,42 @@ export default function LovelyPeople() {
       toast.error('SYNC_ERROR');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const addPerson = async () => {
+    const name = newName.trim();
+    if (!name) {
+      toast.error('ENTER_NAME');
+      return;
+    }
+
+    try {
+      setAdding(true);
+      const { data, error } = await supabase
+        .from('lovely_people')
+        .insert([{ Name: name }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setPeople((p) => [data as LovelyPerson, ...p]);
+        toast.success('PERSON_ADDED');
+        setNewName('');
+        setShowAdd(false);
+      }
+    } catch (err: any) {
+      console.error('Add person error', err);
+      // Row-Level Security violation (client cannot insert) — show clearer guidance
+      if (err?.code === '42501') {
+        toast.error('DB_PERMISSION_DENIED — check RLS policy for lovely_people');
+      } else {
+        toast.error('ADD_FAILED');
+      }
+    } finally {
+      setAdding(false);
     }
   };
 
@@ -162,6 +205,26 @@ export default function LovelyPeople() {
                 className="border-none bg-transparent font-pixel text-[9px] h-12 sm:h-14 focus-visible:ring-0 placeholder:text-rose-200 uppercase w-full"
               />
             </div>
+            {isAdmin && (
+              <div className="mt-3 flex items-center gap-3">
+                {!showAdd ? (
+                  <Button onClick={() => setShowAdd(true)} className="pixel-btn-pink px-3 py-2 text-[10px]">ADD_PERSON</Button>
+                ) : (
+                  <div className="flex w-full gap-2">
+                    <Input
+                      placeholder="NAME"
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      className="bg-white border-2 border-black px-3 py-2 font-pixel text-[9px] uppercase w-full"
+                    />
+                    <Button onClick={addPerson} disabled={adding || !newName.trim()} className="pixel-btn-pink px-3 py-2">
+                      {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : 'SAVE'}
+                    </Button>
+                    <Button onClick={() => { setShowAdd(false); setNewName(''); }} className="px-3 py-2 bg-gray-200 border-2 border-black text-black">CANCEL</Button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -223,7 +286,30 @@ export default function LovelyPeople() {
              <div className="w-2 h-2 bg-rose-500 animate-ping" />
              <span className="text-white text-[10px]">Total_Lovely_People: <span className='font-bold text-[16px] text-yellow-300'>{people.length}</span></span>
           </div>
-          <span className="text-rose-400">DESIGNED_BY_CARDLIFY</span>
+          <motion.a 
+  href="https://www.instagram.com/cardlify26" 
+  target="_blank" 
+  rel="noopener noreferrer"
+  // Floating animation
+  animate={{ y: [0, -3, 0] }}
+  transition={{ 
+    duration: 3, 
+    repeat: Infinity, 
+    ease: "easeInOut" 
+  }}
+  className="
+    flex items-center gap-1.5 
+    bg-gradient-to-r from-rose-500 to-pink-500 
+    text-white text-[9px] font-bold tracking-wider
+    px-2.5 py-1 rounded-full
+    shadow-[0_0_10px_rgba(244,63,94,0.3)]
+    hover:shadow-[0_0_15px_rgba(244,63,94,0.6)]
+    hover:scale-105 transition-all
+  "
+>
+  <Instagram size={10} strokeWidth={3} />
+  <span className="opacity-90">FOLLOW_CARDLIFY</span>
+</motion.a>
         </div>
       </main>
     </div>
