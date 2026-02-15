@@ -41,6 +41,13 @@ const PREMIUM_FONTS = [
   { name: 'Roboto Mono', category: 'Monospace', weights: [300, 400, 500, 600, 700] },
   { name: 'Fira Code', category: 'Monospace', weights: [300, 400, 500, 600, 700] },
   { name: 'JetBrains Mono', category: 'Monospace', weights: [300, 400, 500, 600, 700, 800] },
+  // Bangla Fonts
+  { name: 'Noto Sans Bengali', category: 'Bangla', weights: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
+  { name: 'Noto Serif Bengali', category: 'Bangla', weights: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
+  { name: 'Hind Siliguri', category: 'Bangla', weights: [300, 400, 500, 600, 700] },
+  { name: 'Baloo Da 2', category: 'Bangla', weights: [400, 500, 600, 700, 800] },
+  { name: 'Mina', category: 'Bangla', weights: [400, 700] },
+  { name: 'Tiro Bangla', category: 'Bangla', weights: [400] },
 ];
 
 interface Field {
@@ -158,7 +165,10 @@ export default function SubmissionForm() {
             font.weights.forEach(weight => {
               const fontString = `${weight} 16px "${font.name}", sans-serif`;
               preloadCtx.font = fontString;
+              // Use both Latin and Bangla characters for preloading
               preloadCtx.fillText('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 0, 0);
+              // Bangla test characters (if it's a Bangla font, this triggers loading)
+              preloadCtx.fillText('আমি বাংলা গান গাই', 0, 0);
             });
           });
         }
@@ -353,7 +363,7 @@ export default function SubmissionForm() {
             const fontFamily = field.font_family || 'Inter';
             const fontWeight = field.font_weight || 400;
             const fontStyle = field.font_italic ? 'italic' : 'normal';
-            const fontKey = `${fontStyle} ${fontWeight} 16px "${fontFamily}", ${fontFamily}, sans-serif`;
+            const fontKey = `${fontStyle} ${fontWeight} 16px "${fontFamily}", sans-serif`;
             uniqueFonts.add(fontKey);
           }
         });
@@ -363,10 +373,12 @@ export default function SubmissionForm() {
         uniqueFonts.forEach(fontKey => {
           ctx.font = fontKey;
           ctx.fillText('ABCDEFGHIJKLMNOPQRSTUVWXYZ', -1000, -1000);
+          // Also preload Bangla characters for Bangla fonts
+          ctx.fillText('আমি বাংলা গান গাই', -1000, -1000);
         });
 
-        // Wait a moment for fonts to be cached in canvas
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Wait a moment for fonts to be cached in canvas (longer for Bangla fonts)
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         // Draw template background
         ctx.drawImage(templateImg, 0, 0);
@@ -529,8 +541,8 @@ export default function SubmissionForm() {
               const fontWeight = field.font_weight || 400;
               const fontFamily = field.font_family || 'Inter';
               
-              // Load the font into canvas - try multiple formats for compatibility
-              const fontString = `${fontStyle} ${fontWeight} ${scaledFontSize}px "${fontFamily}", ${fontFamily}, sans-serif`;
+              // Load the font into canvas - use proper font stack
+              const fontString = `${fontStyle} ${fontWeight} ${scaledFontSize}px "${fontFamily}", sans-serif`;
               ctx.font = fontString;
               
               // Debug: Log font being used

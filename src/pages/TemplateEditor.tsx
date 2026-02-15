@@ -101,6 +101,13 @@ const PREMIUM_FONTS = [
   { name: 'Roboto Mono', category: 'Monospace', weights: [300, 400, 500, 600, 700] },
   { name: 'Fira Code', category: 'Monospace', weights: [300, 400, 500, 600, 700] },
   { name: 'JetBrains Mono', category: 'Monospace', weights: [300, 400, 500, 600, 700, 800] },
+  // Bangla Fonts
+  { name: 'Noto Sans Bengali', category: 'Bangla', weights: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
+  { name: 'Noto Serif Bengali', category: 'Bangla', weights: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
+  { name: 'Hind Siliguri', category: 'Bangla', weights: [300, 400, 500, 600, 700] },
+  { name: 'Baloo Da 2', category: 'Bangla', weights: [400, 500, 600, 700, 800] },
+  { name: 'Mina', category: 'Bangla', weights: [400, 700] },
+  { name: 'Tiro Bangla', category: 'Bangla', weights: [400] },
 ];
 
 interface Field {
@@ -573,7 +580,7 @@ export default function TemplateEditor() {
     }
   }, [fields, normalizeField, addToHistory, isMobile]);
 
-  const updateField = useCallback((id: string, updates: Partial<Field>) => {
+  const updateField = useCallback((id: string, updates: Partial<Field>, shouldAddToHistory = false) => {
     setFields(prev => {
       const newFields = prev.map(f => {
         if (f.id === id) {
@@ -585,9 +592,15 @@ export default function TemplateEditor() {
         }
         return f;
       });
+      
+      // Add to history if explicitly requested (for property changes that should be undoable)
+      if (shouldAddToHistory) {
+        addToHistory(newFields);
+      }
+      
       return newFields;
     });
-  }, [normalizeField]);
+  }, [normalizeField, addToHistory]);
 
   const deleteField = useCallback((id: string) => {
     const newFields = fields.filter(f => f.id !== id);
@@ -933,13 +946,13 @@ export default function TemplateEditor() {
                   <Label className="text-sm font-semibold">Font Family</Label>
                   <Select
                     value={selectedFieldData.font_family}
-                    onValueChange={(value) => updateField(selectedFieldData.id, { font_family: value })}
+                    onValueChange={(value) => updateField(selectedFieldData.id, { font_family: value }, true)}
                   >
                     <SelectTrigger className="h-10">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="max-h-[300px]">
-                      {['Sans-serif', 'Serif', 'Display', 'Handwriting', 'Monospace'].map(category => (
+                      {['Sans-serif', 'Serif', 'Display', 'Handwriting', 'Monospace', 'Bangla'].map(category => (
                         <div key={category}>
                           <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{category}</div>
                           {PREMIUM_FONTS.filter(f => f.category === category).map(font => (
@@ -960,24 +973,19 @@ export default function TemplateEditor() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label className="text-xs">Font Size</Label>
-                    <div className="flex items-center gap-2">
-                      <Slider
-                        value={[selectedFieldData.font_size]}
-                        onValueChange={([value]) => updateField(selectedFieldData.id, { font_size: value })}
-                        min={8}
-                        max={120}
-                        step={1}
-                        className="flex-1"
-                      />
-                      <span className="text-xs font-mono w-10 text-right">{selectedFieldData.font_size}</span>
-                    </div>
+                    <CommitNumberInput
+                      value={selectedFieldData.font_size}
+                      min={8}
+                      max={120}
+                      onCommit={(value) => updateField(selectedFieldData.id, { font_size: value }, true)}
+                    />
                   </div>
 
                   <div className="space-y-2">
                     <Label className="text-xs">Weight</Label>
                     <Select
                       value={String(selectedFieldData.font_weight)}
-                      onValueChange={(value) => updateField(selectedFieldData.id, { font_weight: Number(value) })}
+                      onValueChange={(value) => updateField(selectedFieldData.id, { font_weight: Number(value) }, true)}
                     >
                       <SelectTrigger className="h-10">
                         <SelectValue />
@@ -999,13 +1007,13 @@ export default function TemplateEditor() {
                     <Input
                       type="color"
                       value={selectedFieldData.font_color}
-                      onChange={(e) => updateField(selectedFieldData.id, { font_color: e.target.value })}
+                      onChange={(e) => updateField(selectedFieldData.id, { font_color: e.target.value }, true)}
                       className="w-16 h-10 p-1 cursor-pointer"
                     />
                     <Input
                       type="text"
                       value={selectedFieldData.font_color}
-                      onChange={(e) => updateField(selectedFieldData.id, { font_color: e.target.value })}
+                      onChange={(e) => updateField(selectedFieldData.id, { font_color: e.target.value }, true)}
                       className="flex-1 h-10 font-mono text-xs"
                     />
                   </div>
@@ -1016,7 +1024,7 @@ export default function TemplateEditor() {
                   <ToggleGroup
                     type="single"
                     value={selectedFieldData.text_align}
-                    onValueChange={(value) => value && updateField(selectedFieldData.id, { text_align: value as Field['text_align'] })}
+                    onValueChange={(value) => value && updateField(selectedFieldData.id, { text_align: value as Field['text_align'] }, true)}
                     className="justify-start"
                   >
                     <ToggleGroupItem value="left" className="px-4 h-10">
@@ -1035,7 +1043,7 @@ export default function TemplateEditor() {
                   <Label className="text-sm cursor-pointer">Italic</Label>
                   <Switch
                     checked={selectedFieldData.font_italic}
-                    onCheckedChange={(checked) => updateField(selectedFieldData.id, { font_italic: checked })}
+                    onCheckedChange={(checked) => updateField(selectedFieldData.id, { font_italic: checked }, true)}
                   />
                 </div>
 
@@ -1044,7 +1052,7 @@ export default function TemplateEditor() {
                   <div className="flex items-center gap-2">
                     <Slider
                       value={[selectedFieldData.letter_spacing]}
-                      onValueChange={([value]) => updateField(selectedFieldData.id, { letter_spacing: value })}
+                      onValueChange={([value]) => updateField(selectedFieldData.id, { letter_spacing: value }, true)}
                       min={-2}
                       max={10}
                       step={0.1}
