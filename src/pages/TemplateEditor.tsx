@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo, memo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
+import { useUserRole } from '@/hooks/useUserRole';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -160,7 +161,8 @@ const FieldOverlay = memo(({
   onMouseDown,
   onTouchStart,
   onClick,
-  scale = 1
+  scale = 1,
+  canEditTemplate
 }: { 
   field: Field;
   isSelected: boolean;
@@ -168,6 +170,7 @@ const FieldOverlay = memo(({
   onTouchStart: (e: React.TouchEvent, fieldId: string, isResize?: boolean) => void;
   onClick: (e: React.MouseEvent | React.TouchEvent) => void;
   scale: number;
+  canEditTemplate: boolean;
 }) => {
   const shapeClass = field.shape === 'circle' 
     ? 'rounded-full' 
@@ -191,6 +194,8 @@ const FieldOverlay = memo(({
         height: `${field.height}%`,
         transform: `rotate(${field.rotation}deg)`,
         opacity: field.opacity,
+        cursor: canEditTemplate ? 'move' : 'default',
+        pointerEvents: canEditTemplate ? 'auto' : 'none',
         border: field.border_enabled 
           ? `${field.border_size}px solid ${field.border_color}` 
           : isSelected 
@@ -205,9 +210,9 @@ const FieldOverlay = memo(({
         touchAction: 'none',
         ...shadowStyle
       }}
-      onMouseDown={(e) => onMouseDown(e, field.id)}
-      onTouchStart={(e) => onTouchStart(e, field.id)}
-      onClick={onClick}
+      onMouseDown={(e) => canEditTemplate && onMouseDown(e, field.id)}
+      onTouchStart={(e) => canEditTemplate && onTouchStart(e, field.id)}
+      onClick={(e) => canEditTemplate && onClick(e)}
     >
       <div className="absolute inset-0 overflow-hidden flex items-center px-1">
         {field.field_type === 'photo' ? (
@@ -236,7 +241,7 @@ const FieldOverlay = memo(({
       </div>
     
       {/* Resize Handle - larger for touch */}
-      {isSelected && (
+      {isSelected && canEditTemplate && (
         <>
           <div
             className="absolute -bottom-2 -right-2 w-6 h-6 md:w-5 md:h-5 bg-blue-500 rounded-sm border-2 border-white cursor-se-resize shadow-lg hover:scale-110 transition-transform z-10 touch-none"
@@ -257,6 +262,7 @@ FieldOverlay.displayName = 'FieldOverlay';
 export default function TemplateEditor() {
   const { projectId } = useParams<{ projectId: string }>();
   const { user } = useAuth();
+  const { isElite, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
   
   const [project, setProject] = useState<Project | null>(null);
@@ -264,6 +270,7 @@ export default function TemplateEditor() {
   const [selectedField, setSelectedField] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingTemplate, setUploadingTemplate] = useState(false);
   const [formLink, setFormLink] = useState('');
   
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -285,6 +292,7 @@ export default function TemplateEditor() {
   const [history, setHistory] = useState<HistoryState[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const maxHistory = 50;
+  const canEditTemplate = isElite;
 
   // Check if mobile
   useEffect(() => {
@@ -536,7 +544,69 @@ export default function TemplateEditor() {
     setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
   };
 
+  const handleReplaceTemplateImage = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!canEditTemplate) {
+      toast.error('Main template changes are available for Pro users only.');
+      return;
+    }
+
+    const file = event.target.files?.[0];
+    if (!file || !projectId || !user) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Template image must be less than 5MB');
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file');
+      return;
+    }
+
+    setUploadingTemplate(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('templates')
+        .upload(fileName, file, { cacheControl: '3600', upsert: false });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('templates')
+        .getPublicUrl(fileName);
+
+      const { error: updateError } = await supabase
+        .from('projects')
+        .update({ template_image_url: publicUrl })
+        .eq('id', projectId);
+
+      if (updateError) throw updateError;
+
+      setProject(prev => prev ? { ...prev, template_image_url: publicUrl } : prev);
+      toast.success('Main template updated successfully');
+    } catch (error) {
+      console.error('Error replacing template image:', error);
+      toast.error('Failed to update template image');
+    } finally {
+      setUploadingTemplate(false);
+      event.target.value = '';
+    }
+  };
+
+  const handleEditRestriction = useCallback(() => {
+    if (!canEditTemplate) {
+      toast.error('Template editing is available for Pro users only. Upgrade to move, resize, or adjust your design.');
+      return false;
+    }
+    return true;
+  }, [canEditTemplate]);
+
   const addField = useCallback((type: 'photo' | 'text') => {
+    if (!handleEditRestriction()) return;
+
     const maxZIndex = fields.reduce((max, f) => Math.max(max, f.z_index || 1), 0);
     const newField: Field = {
       id: `temp-${Date.now()}`,
@@ -578,9 +648,11 @@ export default function TemplateEditor() {
     if (isMobile) {
       setIsPropertiesOpen(true);
     }
-  }, [fields, normalizeField, addToHistory, isMobile]);
+  }, [fields, normalizeField, addToHistory, isMobile, handleEditRestriction]);
 
   const updateField = useCallback((id: string, updates: Partial<Field>, shouldAddToHistory = false) => {
+    if (!canEditTemplate) return;
+
     setFields(prev => {
       const newFields = prev.map(f => {
         if (f.id === id) {
@@ -600,18 +672,21 @@ export default function TemplateEditor() {
       
       return newFields;
     });
-  }, [normalizeField, addToHistory]);
+  }, [normalizeField, addToHistory, canEditTemplate]);
 
   const deleteField = useCallback((id: string) => {
+    if (!handleEditRestriction()) return;
+
     const newFields = fields.filter(f => f.id !== id);
     setFields(newFields);
     setSelectedField(null);
     addToHistory(newFields);
     setIsPropertiesOpen(false);
     toast.success('Field deleted');
-  }, [fields, addToHistory]);
+  }, [fields, addToHistory, handleEditRestriction]);
 
   const duplicateField = useCallback(() => {
+    if (!handleEditRestriction()) return;
     if (!selectedField) return;
     
     const field = fields.find(f => f.id === selectedField);
@@ -632,7 +707,7 @@ export default function TemplateEditor() {
     setSelectedField(newField.id);
     addToHistory(newFields);
     toast.success('Field duplicated');
-  }, [selectedField, fields, addToHistory]);
+  }, [selectedField, fields, addToHistory, handleEditRestriction]);
 
   const copyField = useCallback(() => {
     if (!selectedField) return;
@@ -644,12 +719,14 @@ export default function TemplateEditor() {
   }, [selectedField, fields]);
 
   const bringToFront = useCallback(() => {
+    if (!handleEditRestriction()) return;
     if (!selectedField) return;
     const maxZIndex = fields.reduce((max, f) => Math.max(max, f.z_index || 1), 0);
     updateField(selectedField, { z_index: maxZIndex + 1 });
   }, [selectedField, fields, updateField]);
 
   const sendToBack = useCallback(() => {
+    if (!handleEditRestriction()) return;
     if (!selectedField) return;
     const minZIndex = fields.reduce((min, f) => Math.min(min, f.z_index || 1), 999);
     updateField(selectedField, { z_index: minZIndex - 1 });
@@ -663,6 +740,8 @@ export default function TemplateEditor() {
   };
 
   const handleMouseDown = useCallback((e: React.MouseEvent, fieldId: string, isResize = false) => {
+    if (!canEditTemplate) return;
+
     e.stopPropagation();
     setSelectedField(fieldId);
     
@@ -685,9 +764,11 @@ export default function TemplateEditor() {
         });
       }
     }
-  }, [fields, isMobile]);
+  }, [fields, isMobile, canEditTemplate]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent, fieldId: string, isResize = false) => {
+    if (!canEditTemplate) return;
+
     e.stopPropagation();
     setSelectedField(fieldId);
     
@@ -711,10 +792,10 @@ export default function TemplateEditor() {
         });
       }
     }
-  }, [fields, isMobile]);
+  }, [fields, isMobile, canEditTemplate]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!canvasRef.current) return;
+    if (!canEditTemplate || !canvasRef.current) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
     
@@ -747,10 +828,10 @@ export default function TemplateEditor() {
 
       updateField(resizing, { width, height });
     }
-  }, [dragging, resizing, fields, dragOffset, updateField, snapValue]);
+  }, [dragging, resizing, fields, dragOffset, updateField, snapValue, canEditTemplate]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!canvasRef.current) return;
+    if (!canEditTemplate || !canvasRef.current) return;
     
     const touch = e.touches[0];
     const rect = canvasRef.current.getBoundingClientRect();
@@ -784,17 +865,20 @@ export default function TemplateEditor() {
 
       updateField(resizing, { width, height });
     }
-  }, [dragging, resizing, fields, dragOffset, updateField, snapValue]);
+  }, [dragging, resizing, fields, dragOffset, updateField, snapValue, canEditTemplate]);
 
   const handleMouseUp = useCallback(() => {
+    if (!canEditTemplate) return;
+
     if (dragging || resizing) {
       addToHistory(fields);
     }
     setDragging(null);
     setResizing(null);
-  }, [dragging, resizing, fields, addToHistory]);
+  }, [dragging, resizing, fields, addToHistory, canEditTemplate]);
 
   const saveFields = async () => {
+    if (!handleEditRestriction()) return;
     if (!projectId) return;
     
     setSaving(true);
@@ -842,6 +926,18 @@ export default function TemplateEditor() {
   // Properties Panel Component (for mobile drawer)
   const PropertiesPanel = () => {
     if (!selectedFieldData) return null;
+
+    if (!canEditTemplate) {
+      return (
+        <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <p className="font-medium">Pro editing is required to change layout details.</p>
+          <p>Upgrade to Pro to move, resize, or style fields directly in your template.</p>
+          <Button variant="outline" size="sm" onClick={() => navigate('/pricing')} className="mt-1">
+            Upgrade to Pro
+          </Button>
+        </div>
+      );
+    }
 
     return (
       <div className="space-y-4 pb-6">
@@ -1255,7 +1351,7 @@ export default function TemplateEditor() {
     );
   };
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <div className="text-center">
@@ -1456,7 +1552,7 @@ export default function TemplateEditor() {
                 variant="ghost"
                 size="sm"
                 onClick={undo}
-                disabled={historyIndex <= 0}
+                disabled={!canEditTemplate || historyIndex <= 0}
                 className="p-2 hidden sm:flex"
               >
                 <Undo className="w-4 h-4" />
@@ -1465,7 +1561,7 @@ export default function TemplateEditor() {
                 variant="ghost"
                 size="sm"
                 onClick={redo}
-                disabled={historyIndex >= history.length - 1}
+                disabled={!canEditTemplate || historyIndex >= history.length - 1}
                 className="p-2 hidden sm:flex"
               >
                 <Redo className="w-4 h-4" />
@@ -1481,7 +1577,7 @@ export default function TemplateEditor() {
               </Button>
               <Button
                 onClick={saveFields}
-                disabled={saving}
+                disabled={saving || !canEditTemplate}
                 size="sm"
                 className="gap-1 md:gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-xs md:text-sm px-2 md:px-3 h-8 md:h-9"
               >
@@ -1518,6 +1614,7 @@ export default function TemplateEditor() {
                 <Button
                   onClick={() => addField('text')}
                   variant="outline"
+                  disabled={!canEditTemplate}
                   className="w-full justify-start gap-2 hover:bg-blue-50 transition-colors"
                 >
                   <Type className="w-4 h-4" />
@@ -1526,6 +1623,7 @@ export default function TemplateEditor() {
                 <Button
                   onClick={() => addField('photo')}
                   variant="outline"
+                  disabled={!canEditTemplate}
                   className="w-full justify-start gap-2 hover:bg-purple-50 transition-colors"
                 >
                   <Image className="w-4 h-4" />
@@ -1545,6 +1643,7 @@ export default function TemplateEditor() {
                         variant="ghost"
                         size="sm"
                         onClick={duplicateField}
+                        disabled={!canEditTemplate}
                         className="h-8 w-8 p-0"
                         title="Duplicate (Ctrl+D)"
                       >
@@ -1554,6 +1653,7 @@ export default function TemplateEditor() {
                         variant="ghost"
                         size="sm"
                         onClick={() => deleteField(selectedFieldData.id)}
+                        disabled={!canEditTemplate}
                         className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                         title="Delete (Del)"
                       >
@@ -1618,6 +1718,27 @@ export default function TemplateEditor() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                <div className="space-y-2 rounded-lg border border-dashed border-blue-200 bg-blue-50/70 p-3">
+                  <Label className="text-xs font-semibold">Main Template</Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Replace the base template image when the existing design needs fixing.
+                  </p>
+                  <label className={`inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition ${canEditTemplate ? 'border-blue-300 bg-white hover:bg-blue-100' : 'border-slate-200 bg-slate-100 text-slate-500'}`}>
+                    {uploadingTemplate ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Image className="w-4 h-4" />
+                    )}
+                    {uploadingTemplate ? 'Uploading...' : 'Replace Template Image'}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      className="hidden"
+                      onChange={handleReplaceTemplateImage}
+                      disabled={!canEditTemplate || uploadingTemplate}
+                    />
+                  </label>
+                </div>
                 <div className="flex items-center justify-between">
                   <Label className="text-xs">Snap to Grid</Label>
                   <Switch
@@ -1731,12 +1852,14 @@ export default function TemplateEditor() {
                       onTouchStart={handleTouchStart}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (!canEditTemplate) return;
                         setSelectedField(field.id);
                         if (isMobile) {
                           setIsPropertiesOpen(true);
                         }
                       }}
                       scale={zoom}
+                      canEditTemplate={canEditTemplate}
                     />
                   ))}
                 </div>
@@ -1785,6 +1908,7 @@ export default function TemplateEditor() {
           <Button
             onClick={() => addField('text')}
             size="lg"
+            disabled={!canEditTemplate}
             className="rounded-full w-14 h-14 shadow-2xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
           >
             <Type className="w-6 h-6" />
@@ -1792,6 +1916,7 @@ export default function TemplateEditor() {
           <Button
             onClick={() => addField('photo')}
             size="lg"
+            disabled={!canEditTemplate}
             className="rounded-full w-14 h-14 shadow-2xl bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800"
           >
             <Image className="w-6 h-6" />
