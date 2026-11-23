@@ -185,7 +185,7 @@ const FieldOverlay = memo(({
   return (
     <div
       className={`absolute cursor-move overflow-hidden transition-all duration-100 ${shapeClass} ${
-        isSelected ? 'ring-2 ring-blue-500 ring-offset-2 z-50' : ''
+        isSelected ? 'ring-2 ring-foreground/40 ring-offset-2 z-50' : ''
       }`}
       style={{
         left: `${field.x_position}%`,
@@ -244,13 +244,13 @@ const FieldOverlay = memo(({
       {isSelected && canEditTemplate && (
         <>
           <div
-            className="absolute -bottom-2 -right-2 w-6 h-6 md:w-5 md:h-5 bg-blue-500 rounded-sm border-2 border-white cursor-se-resize shadow-lg hover:scale-110 transition-transform z-10 touch-none"
+            className="absolute -bottom-2 -right-2 w-6 h-6 md:w-5 md:h-5 bg-lime rounded-sm border-2 border-white cursor-se-resize shadow-lg hover:scale-110 transition-transform z-10 touch-none"
             onMouseDown={(e) => onMouseDown(e, field.id, true)}
             onTouchStart={(e) => onTouchStart(e, field.id, true)}
           />
-          <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-blue-500 rounded-sm border-2 border-white shadow" />
-          <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-blue-500 rounded-sm border-2 border-white shadow" />
-          <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-blue-500 rounded-sm border-2 border-white shadow" />
+          <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-lime rounded-sm border-2 border-white shadow" />
+          <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-lime rounded-sm border-2 border-white shadow" />
+          <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-lime rounded-sm border-2 border-white shadow" />
         </>
       )}
     </div>
@@ -1353,9 +1353,9 @@ export default function TemplateEditor() {
 
   if (loading || roleLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <Loader2 className="w-12 h-12 animate-spin text-foreground/50 mx-auto mb-4" />
           <p className="text-muted-foreground">Loading editor...</p>
         </div>
       </div>
@@ -1363,7 +1363,7 @@ export default function TemplateEditor() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Mobile-Optimized Header */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-lg border-b shadow-sm">
         <div className="container mx-auto px-3 md:px-4 py-2 md:py-3">
@@ -1381,9 +1381,9 @@ export default function TemplateEditor() {
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="w-[300px] p-0 overflow-y-auto">
-                  <SheetHeader className="p-4 border-b bg-gradient-to-r from-blue-50 to-purple-50">
+                  <SheetHeader className="p-4 border-b bg-secondary/50">
                     <SheetTitle className="text-left flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 text-blue-600" />
+                      <Sparkles className="w-5 h-5 text-foreground/50" />
                       Controls
                     </SheetTitle>
                   </SheetHeader>
@@ -1391,7 +1391,7 @@ export default function TemplateEditor() {
                   <div className="p-4 space-y-4">
                     {/* Add Fields */}
                     <Card className="shadow-sm border">
-                      <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-purple-50">
+                      <CardHeader className="pb-3 bg-secondary/50">
                         <CardTitle className="text-sm">Add Elements</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-2 pt-4">
@@ -1422,9 +1422,9 @@ export default function TemplateEditor() {
 
                     {/* Layers List */}
                     <Card className="shadow-sm border">
-                      <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-purple-50">
+                      <CardHeader className="pb-3 bg-secondary/50">
                         <CardTitle className="text-sm flex items-center gap-2">
-                          <Layers className="w-4 h-4 text-blue-600" />
+                          <Layers className="w-4 h-4 text-foreground/50" />
                           Layers ({fields.length})
                         </CardTitle>
                       </CardHeader>
@@ -1445,7 +1445,7 @@ export default function TemplateEditor() {
                                 }}
                                 className={`w-full text-left px-3 py-3 rounded-lg text-sm flex items-center gap-2 transition-all ${
                                   selectedField === field.id 
-                                    ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md' 
+                                    ? 'bg-foreground text-paper shadow-md' 
                                     : 'bg-muted hover:bg-muted/80 hover:shadow'
                                 }`}
                               >
@@ -1467,9 +1467,9 @@ export default function TemplateEditor() {
 
                     {/* Canvas Controls */}
                     <Card className="shadow-sm border">
-                      <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-purple-50">
+                      <CardHeader className="pb-3 bg-secondary/50">
                         <CardTitle className="text-sm flex items-center gap-2">
-                          <Grid3x3 className="w-4 h-4 text-blue-600" />
+                          <Grid3x3 className="w-4 h-4 text-foreground/50" />
                           Canvas
                         </CardTitle>
                       </CardHeader>
@@ -1604,9 +1604,9 @@ export default function TemplateEditor() {
           <div className="hidden lg:block lg:col-span-1 space-y-4 overflow-y-auto max-h-[calc(100vh-140px)]">
             {/* Add Fields */}
             <Card className="shadow-lg border-2">
-              <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-purple-50">
+              <CardHeader className="pb-3 bg-secondary/50">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-blue-600" />
+                  <Sparkles className="w-4 h-4 text-foreground/50" />
                   Add Elements
                 </CardTitle>
               </CardHeader>
@@ -1635,7 +1635,7 @@ export default function TemplateEditor() {
             {/* Field Properties */}
             {selectedFieldData && (
               <Card className="shadow-lg border-2">
-                <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-purple-50">
+                <CardHeader className="pb-3 bg-secondary/50">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm">Field Properties</CardTitle>
                     <div className="flex gap-1">
@@ -1670,9 +1670,9 @@ export default function TemplateEditor() {
 
             {/* Fields List */}
             <Card className="shadow-lg border-2">
-              <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-purple-50">
+              <CardHeader className="pb-3 bg-secondary/50">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-blue-600" />
+                  <Layers className="w-4 h-4 text-foreground/50" />
                   Layers ({fields.length})
                 </CardTitle>
               </CardHeader>
@@ -1689,7 +1689,7 @@ export default function TemplateEditor() {
                         onClick={() => setSelectedField(field.id)}
                         className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-all ${
                           selectedField === field.id 
-                            ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md scale-[1.02]' 
+                            ? 'bg-foreground text-paper shadow-md scale-[1.02]' 
                             : 'bg-muted hover:bg-muted/80 hover:shadow'
                         }`}
                       >
@@ -1711,9 +1711,9 @@ export default function TemplateEditor() {
 
             {/* Canvas Controls */}
             <Card className="shadow-lg border-2">
-              <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-purple-50">
+              <CardHeader className="pb-3 bg-secondary/50">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <Grid3x3 className="w-4 h-4 text-blue-600" />
+                  <Grid3x3 className="w-4 h-4 text-foreground/50" />
                   Canvas Controls
                 </CardTitle>
               </CardHeader>
@@ -1886,9 +1886,9 @@ export default function TemplateEditor() {
       {isMobile && (
         <Drawer open={isPropertiesOpen} onOpenChange={setIsPropertiesOpen}>
           <DrawerContent className="max-h-[85vh]">
-            <DrawerHeader className="border-b bg-gradient-to-r from-blue-50 to-purple-50">
+            <DrawerHeader className="border-b bg-secondary/50">
               <DrawerTitle className="flex items-center gap-2">
-                <Settings className="w-5 h-5 text-blue-600" />
+                <Settings className="w-5 h-5 text-foreground/50" />
                 {selectedFieldData ? `Edit: ${selectedFieldData.field_name}` : 'Field Properties'}
               </DrawerTitle>
               <DrawerDescription>

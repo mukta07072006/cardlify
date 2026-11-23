@@ -1,17 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { ArrowLeft, Loader2, Sparkles, User, Mail, Lock } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Loader2, Lock, Mail, User } from 'lucide-react';
 import { z } from 'zod';
+import { Eyebrow, Wordmark } from '@/components/studio';
 
 const authSchema = z.object({
-  email: z.string().email('INVALID_EMAIL'),
-  password: z.string().min(6, 'MIN_6_CHARS'),
-  name: z.string().min(2, 'MIN_2_CHARS').optional(),
+  email: z.string().email('Enter a valid email'),
+  password: z.string().min(6, 'At least 6 characters'),
+  name: z.string().min(2, 'At least 2 characters').optional(),
 });
 
 export default function Auth() {
@@ -21,15 +22,12 @@ export default function Auth() {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; name?: string }>({});
-  
+
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) {
-      navigate('/dashboard');
-    }
-    document.fonts.load('10pt "Press Start 2P"');
+    if (user) navigate('/dashboard');
   }, [user, navigate]);
 
   const validateForm = () => {
@@ -66,7 +64,7 @@ export default function Auth() {
         if (error) {
           toast.error(error.message);
         } else {
-          toast.success('SYSTEM_READY: ACCESS_GRANTED');
+          toast.success('Welcome back');
           navigate('/dashboard');
         }
       } else {
@@ -74,7 +72,7 @@ export default function Auth() {
         if (error) {
           toast.error(error.message);
         } else {
-          toast.success('ACCOUNT_CREATED: VERIFY_EMAIL');
+          toast.success('Account created — check your inbox');
           setIsLogin(true);
         }
       }
@@ -84,183 +82,192 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen w-full relative bg-[#f4f4f0] text-black font-mono uppercase flex items-center justify-center p-4 overflow-x-hidden">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-        .font-pixel { font-family: 'Press Start 2P', cursive; }
-        
-        .pixel-card {
-          background: white;
-          border: 4px solid black;
-          box-shadow: 12px 12px 0px 0px rgba(0,0,0,1);
-        }
+    <div className="flex min-h-screen flex-col bg-background">
+      <header className="mx-auto flex w-full max-w-[1400px] items-center justify-between px-5 py-6 sm:px-6">
+        <Link to="/" aria-label="Cardlify home">
+          <Wordmark />
+        </Link>
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-sm text-foreground/55 transition hover:text-foreground"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" /> Back to studio
+        </Link>
+      </header>
 
-        .pixel-btn-black {
-          background: black;
-          color: white;
-          border: 4px solid black;
-          box-shadow: 4px 4px 0px 0px #f43f5e;
-          transition: all 0.1s;
-        }
-        .pixel-btn-black:active {
-          transform: translate(2px, 2px);
-          box-shadow: 0px 0px 0px 0px black;
-        }
+      <main className="mx-auto grid w-full max-w-[1400px] flex-1 items-center gap-16 px-5 pb-16 sm:px-6 lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="hidden lg:block">
+          <Eyebrow>{isLogin ? 'Welcome back' : 'Start your studio'}</Eyebrow>
+          <h1 className="display-xl mt-6">
+            Your next 500 cards
+            <br />
+            start <span className="serif text-[1.05em]">here.</span>
+          </h1>
+          <p className="mt-7 max-w-md text-base leading-relaxed text-foreground/55">
+            One account gives you the template editor, unlimited participant links and the whole
+            export pipeline. No design software, no spreadsheets.
+          </p>
 
-        .pixel-input {
-          border: 4px solid black !important;
-          background: #fdfdfd !important;
-          border-radius: 0 !important;
-          font-family: 'Press Start 2P', cursive;
-          font-size: 8px !important;
-        }
+          <ul className="mt-10 space-y-4">
+            {[
+              '100 free cards on the free plan',
+              'Participants never need an account',
+              'Every card private until you share it',
+            ].map((item) => (
+              <li key={item} className="flex items-center gap-3 text-sm text-foreground/70">
+                <span className="grid h-6 w-6 place-items-center rounded-full bg-lime">
+                  <Check className="h-3.5 w-3.5" />
+                </span>
+                {item}
+              </li>
+            ))}
+          </ul>
 
-        @keyframes step-float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-10px); }
-        }
-        .animate-step-float { animation: step-float 4s steps(4) infinite; }
+          <div className="mt-12 max-w-sm rounded-3xl border border-foreground/10 bg-lilac/40 p-6">
+            <p className="text-sm leading-relaxed text-foreground/70">
+              “We printed 340 conference badges in an afternoon. The layout never moved once.”
+            </p>
+            <p className="mono-label mt-4 text-[10px] text-foreground/45">
+              Salim Ullah · Design Guild
+            </p>
+          </div>
+        </div>
 
-        .bg-grid {
-          background-size: 40px 40px;
-          background-image: radial-gradient(circle, #000 1px, transparent 1px);
-          opacity: 0.1;
-        }
-      `}</style>
+        <div className="mx-auto w-full max-w-md">
+          <div className="surface p-6 sm:p-9">
+            <div className="flex rounded-full border border-foreground/10 bg-background/60 p-1.5">
+              {[
+                { label: 'Sign in', value: true },
+                { label: 'Create account', value: false },
+              ].map((tab) => (
+                <button
+                  key={tab.label}
+                  type="button"
+                  onClick={() => {
+                    setIsLogin(tab.value);
+                    setErrors({});
+                  }}
+                  className={`flex-1 rounded-full px-4 py-2 text-sm font-medium transition ${
+                    isLogin === tab.value
+                      ? 'bg-foreground text-paper'
+                      : 'text-foreground/55 hover:text-foreground'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
 
-      {/* Pixelated Background Elements */}
-      <div className="fixed inset-0 bg-grid z-0" />
-      <div className="fixed top-20 right-20 w-32 h-32 bg-rose-500/10 border-4 border-black -rotate-12 z-0" />
-      <div className="fixed bottom-20 left-20 w-24 h-24 bg-black/5 border-4 border-black rotate-12 z-0" />
+            <div className="mt-8">
+              <h2 className="display-md">
+                {isLogin ? 'Sign in to Cardlify' : 'Create your account'}
+              </h2>
+              <p className="mt-2 text-sm text-foreground/50">
+                {isLogin
+                  ? 'Pick up where your last batch left off.'
+                  : 'Free forever for one project and 100 cards.'}
+              </p>
+            </div>
 
-      {/* Back to Home Link */}
-      <Link to="/" className="absolute top-8 left-8 z-50 flex items-center gap-2 text-black hover:text-rose-500 transition-colors font-pixel text-[8px]">
-        <ArrowLeft className="w-4 h-4" />
-        <span>BACK_TO_HOME</span>
-      </Link>
-
-      {/* Main Container */}
-      <div className="w-full max-w-[1000px] grid lg:grid-cols-2 gap-16 items-center relative z-10">
-        
-        {/* Left Side: Visual/Branding */}
-        <div className="hidden lg:flex flex-col justify-center items-start space-y-12">
-            <div className="relative">
-                <div className="relative z-10 bg-white p-2 border-4 border-black shadow-[10px_10px_0px_0px_#f43f5e] animate-step-float max-w-[280px]">
-                    <img 
-                        src="https://images.unsplash.com/photo-1542598953-41310c43f54b?q=80&w=2070&auto=format&fit=crop" 
-                        alt="Visual" 
-                        className="w-full h-auto object-cover aspect-[3/4] grayscale contrast-125"
+            <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+              {!isLogin && (
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="mono-label text-foreground/45">
+                    Full name
+                  </Label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/30" />
+                    <Input
+                      id="name"
+                      placeholder="Ayesha Rahman"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="h-12 rounded-xl border-foreground/15 bg-white/70 pl-11"
                     />
-                    <div className="absolute -bottom-6 -right-6 bg-black text-white p-3 border-4 border-white shadow-lg flex items-center gap-3">
-                        <Sparkles className="w-4 h-4 text-rose-500" />
-                        <span className="font-pixel text-[7px]">2K_USERS_ACTIVE</span>
-                    </div>
+                  </div>
+                  {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                 </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="email" className="mono-label text-foreground/45">
+                  Email address
+                </Label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/30" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="you@studio.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="h-12 rounded-xl border-foreground/15 bg-white/70 pl-11"
+                  />
+                </div>
+                {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password" className="mono-label text-foreground/45">
+                    Password
+                  </Label>
+                  {isLogin && (
+                    <span className="text-[11px] text-foreground/35">Min. 6 characters</span>
+                  )}
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/30" />
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="h-12 rounded-xl border-foreground/15 bg-white/70 pl-11"
+                  />
+                </div>
+                {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
+              </div>
+
+              <Button type="submit" size="lg" disabled={loading} className="group w-full">
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Working…
+                  </>
+                ) : (
+                  <>
+                    {isLogin ? 'Continue' : 'Create account'}
+                    <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
+                  </>
+                )}
+              </Button>
+            </form>
+
+            <div className="mt-7 flex items-center gap-3">
+              <span className="h-px flex-1 bg-foreground/10" />
+              <span className="mono-label text-[9px] text-foreground/30">or</span>
+              <span className="h-px flex-1 bg-foreground/10" />
             </div>
 
-            <div className="space-y-6">
-                <h2 className="font-pixel text-3xl leading-tight text-black">
-                    STUDIO_<br/>
-                    <span className="text-rose-500 italic">ACCESS.</span>
-                </h2>
-                <p className="text-stone-500 font-pixel text-[8px] max-w-xs leading-loose">
-                    &gt; INITIALIZING_ID_GENERATOR...<br/>
-                    &gt; MINT_CARDS_IN_SECONDS.
-                </p>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setIsLogin(!isLogin);
+                setErrors({});
+              }}
+              className="mt-5 w-full text-center text-sm text-foreground/55 transition hover:text-foreground"
+            >
+              {isLogin ? 'New here? Create an account' : 'Already have an account? Sign in'}
+            </button>
+          </div>
+
+          <p className="mono-label mt-6 text-center text-[9px] text-foreground/30">
+            Secure by default · powered by Supabase
+          </p>
         </div>
-
-        {/* Right Side: Auth Form */}
-        <div className="w-full max-w-md mx-auto">
-            <div className="pixel-card p-8 md:p-10 relative overflow-hidden">
-                
-                {/* Form Header */}
-                <div className="text-center mb-10 relative z-10">
-                    <div className="inline-flex items-center justify-center w-auto h-auto mb-6">
-                        <img 
-                          src="/cardlify.png" 
-                          alt="Logo" 
-                          className="w-40 h-auto object-contain"
-                        />
-                    </div>
-                    <h1 className="font-pixel text-lg text-black mb-4 uppercase">
-                        {isLogin ? 'USER_SIGN_IN' : 'CREATE_ID'}
-                    </h1>
-                    <div className="h-1 w-20 bg-black mx-auto mb-4" />
-                </div>
-
-                {/* The Form */}
-                <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
-                    
-                    {!isLogin && (
-                        <div className="space-y-2">
-                            <Label className="font-pixel text-[7px] text-stone-400">FULL_NAME</Label>
-                            <div className="relative">
-                                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
-                                <Input
-                                    placeholder="TYPE_NAME..."
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    className="pixel-input pl-10 h-12"
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="space-y-2">
-                        <Label className="font-pixel text-[7px] text-stone-400">EMAIL_ADDRESS</Label>
-                        <div className="relative">
-                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
-                            <Input
-                                type="email"
-                                placeholder="USER@DOMAIN.COM"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="pixel-input pl-10 h-12"
-                            />
-                        </div>
-                        {errors.email && <p className="font-pixel text-[6px] text-rose-500">{errors.email}</p>}
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label className="font-pixel text-[7px] text-stone-400">SECURITY_KEY</Label>
-                        <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
-                            <Input
-                                type="password"
-                                placeholder="********"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="pixel-input pl-10 h-12"
-                            />
-                        </div>
-                    </div>
-
-                    <Button 
-                        type="submit" 
-                        disabled={loading}
-                        className="w-full h-14 rounded-none font-pixel text-[9px] pixel-btn-black uppercase"
-                    >
-                        {loading ? 'PROCESSING...' : (isLogin ? 'LOGIN_NOW' : 'MINT_ACCOUNT')}
-                    </Button>
-                </form>
-
-                {/* Toggle Link */}
-                <div className="mt-10 pt-6 border-t-4 border-stone-100 text-center relative z-10">
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setIsLogin(!isLogin);
-                            setErrors({});
-                        }}
-                        className="font-pixel text-[8px] text-black hover:text-rose-500 transition-colors uppercase underline underline-offset-8"
-                    >
-                        {isLogin ? "NEW_ENTRY?_REGISTER" : "HAVE_ID?_SIGN_IN"}
-                    </button>
-                </div>
-            </div>
-        </div>
-      </div>
+      </main>
     </div>
   );
 }

@@ -335,8 +335,8 @@ export default function Admin() {
 
   if (authLoading || roleLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-rose-50/50">
-        <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-foreground/40" />
       </div>
     );
   }
@@ -346,15 +346,15 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]">
+    <div className="min-h-screen bg-background">
       {/* Decorative gradient blur */}
-      <div className="fixed top-0 left-0 w-full h-64 bg-gradient-to-b from-rose-50/80 to-transparent pointer-events-none" />
+      <div className="fixed top-0 left-0 w-full h-64 bg-gradient-to-b from-lilac/30 to-transparent pointer-events-none" />
 
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-rose-100 bg-white/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-foreground/10 bg-background/80 backdrop-blur-xl">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-100 to-rose-50 border border-rose-100 flex items-center justify-center shadow-sm">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-lilac/60 to-lilac/30 border border-rose-100 flex items-center justify-center shadow-sm">
               <Shield className="w-5 h-5 text-rose-600" />
             </div>
             <div>
@@ -394,21 +394,21 @@ export default function Admin() {
             <TabsList className="bg-white/50 border border-rose-100 p-1 rounded-2xl h-auto shadow-sm backdrop-blur-sm">
               <TabsTrigger 
                 value="users" 
-                className="rounded-xl px-6 py-2.5 data-[state=active]:bg-rose-500 data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-300"
+                className="rounded-xl px-6 py-2.5 data-[state=active]:bg-foreground data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-300"
               >
                 <Users className="w-4 h-4 mr-2" />
                 Users
               </TabsTrigger>
               <TabsTrigger 
                 value="projects" 
-                className="rounded-xl px-6 py-2.5 data-[state=active]:bg-rose-500 data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-300"
+                className="rounded-xl px-6 py-2.5 data-[state=active]:bg-foreground data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-300"
               >
                 <FolderOpen className="w-4 h-4 mr-2" />
                 Projects
               </TabsTrigger>
               <TabsTrigger 
                 value="templates" 
-                className="rounded-xl px-6 py-2.5 data-[state=active]:bg-rose-500 data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-300"
+                className="rounded-xl px-6 py-2.5 data-[state=active]:bg-foreground data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-300"
               >
                 <LayoutTemplate className="w-4 h-4 mr-2" />
                 Templates
@@ -418,7 +418,7 @@ export default function Admin() {
 
           {/* Elite Duration Management Section */}
           <div className="mb-8">
-            <Card className="border-rose-100 shadow-xl shadow-rose-100/20 bg-white/90 backdrop-blur-sm">
+            <Card className="border-foreground/10 shadow-studio bg-white/60 backdrop-blur-sm">
               <CardHeader className="bg-gradient-to-r from-amber-50 to-amber-100/30 border-b border-amber-100 px-8 py-6">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-amber-100 to-amber-50 border border-amber-200 flex items-center justify-center shadow-sm">
@@ -473,7 +473,7 @@ export default function Admin() {
 
           {/* Users Tab */}
           <TabsContent value="users" className="animate-in fade-in-50 duration-500">
-            <Card className="border-rose-100 shadow-xl shadow-rose-100/20 bg-white/90 backdrop-blur-sm overflow-hidden">
+            <Card className="border-foreground/10 shadow-studio bg-white/60 backdrop-blur-sm overflow-hidden">
               <CardHeader className="bg-gradient-to-r from-white to-rose-50/30 border-b border-rose-50 px-8 py-6">
                 <CardTitle className="text-xl font-serif text-slate-800">User Management</CardTitle>
                 <CardDescription className="text-slate-500">
@@ -482,7 +482,7 @@ export default function Admin() {
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
-                  <TableHeader className="bg-rose-50/50">
+                  <TableHeader className="bg-background">
                     <TableRow className="hover:bg-transparent border-rose-100">
                       <TableHead className="pl-8 text-rose-900/60 font-medium">Name</TableHead>
                       <TableHead className="text-rose-900/60 font-medium">Email</TableHead>
@@ -566,7 +566,7 @@ export default function Admin() {
 
           {/* Projects Tab */}
           <TabsContent value="projects" className="animate-in fade-in-50 duration-500">
-            <Card className="border-rose-100 shadow-xl shadow-rose-100/20 bg-white/90 backdrop-blur-sm overflow-hidden">
+            <Card className="border-foreground/10 shadow-studio bg-white/60 backdrop-blur-sm overflow-hidden">
               <CardHeader className="bg-gradient-to-r from-white to-rose-50/30 border-b border-rose-50 px-8 py-6">
                 <CardTitle className="text-xl font-serif text-slate-800">Project Oversight</CardTitle>
                 <CardDescription className="text-slate-500">
@@ -575,7 +575,7 @@ export default function Admin() {
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
-                  <TableHeader className="bg-rose-50/50">
+                  <TableHeader className="bg-background">
                     <TableRow className="hover:bg-transparent border-rose-100">
                       <TableHead className="pl-8 text-rose-900/60 font-medium">Project Name</TableHead>
                       <TableHead className="text-rose-900/60 font-medium">Owner</TableHead>
@@ -624,7 +624,7 @@ export default function Admin() {
 
           {/* Templates Tab */}
           <TabsContent value="templates" className="animate-in fade-in-50 duration-500">
-            <Card className="border-rose-100 shadow-xl shadow-rose-100/20 bg-white/90 backdrop-blur-sm">
+            <Card className="border-foreground/10 shadow-studio bg-white/60 backdrop-blur-sm">
               <CardHeader className="flex flex-row items-center justify-between border-b border-rose-50 px-8 py-6">
                 <div>
                   <CardTitle className="text-xl font-serif text-slate-800">Template Gallery</CardTitle>
@@ -679,7 +679,7 @@ export default function Admin() {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="image">Preview Image</Label>
-                        <div className="border-2 border-dashed border-rose-200 rounded-lg p-4 bg-rose-50/50 hover:bg-rose-50 transition-colors">
+                        <div className="border-2 border-dashed border-rose-200 rounded-lg p-4 bg-background hover:bg-rose-50 transition-colors">
                             <Input
                             id="image"
                             type="file"

@@ -121,6 +121,53 @@ export type Database = {
           },
         ]
       }
+      form_fields: {
+        Row: {
+          created_at: string
+          field_type: string
+          help_text: string | null
+          id: string
+          label: string
+          options: Json
+          placeholder: string | null
+          position: number
+          project_id: string
+          required: boolean
+        }
+        Insert: {
+          created_at?: string
+          field_type?: string
+          help_text?: string | null
+          id?: string
+          label: string
+          options?: Json
+          placeholder?: string | null
+          position?: number
+          project_id: string
+          required?: boolean
+        }
+        Update: {
+          created_at?: string
+          field_type?: string
+          help_text?: string | null
+          id?: string
+          label?: string
+          options?: Json
+          placeholder?: string | null
+          position?: number
+          project_id?: string
+          required?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_fields_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -151,7 +198,11 @@ export type Database = {
       projects: {
         Row: {
           created_at: string
+          form_description: string | null
+          form_header_image_url: string | null
+          form_title: string | null
           id: string
+          project_mode: string
           project_name: string
           status: string
           template_image_url: string | null
@@ -159,7 +210,11 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          form_description?: string | null
+          form_header_image_url?: string | null
+          form_title?: string | null
           id?: string
+          project_mode?: string
           project_name: string
           status?: string
           template_image_url?: string | null
@@ -167,7 +222,11 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          form_description?: string | null
+          form_header_image_url?: string | null
+          form_title?: string | null
           id?: string
+          project_mode?: string
           project_name?: string
           status?: string
           template_image_url?: string | null

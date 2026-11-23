@@ -1,136 +1,149 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Heart } from 'lucide-react';
+import { Wordmark } from '@/components/studio';
+import { ScrollProgress } from '@/components/scroll';
+import { ArrowUpRight, Menu, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const NAV_LINKS = [
-  { label: 'Dashboard', path: '/dashboard' },
-  { label: 'Profile', path: '/profile' },
+  { label: 'Studio', path: '/' },
+  { label: 'Templates', path: '/templates' },
   { label: 'Pricing', path: '/pricing' },
-  { label: 'Lovely_Peoples', path: '/lovelypeoples' },
-  { label: 'Support', path: '#' },
+  { label: 'Lovely People', path: '/lovelypeoples' },
 ];
-
-function LovelyButton({ label, onClick }: { label: string; onClick: () => void }) {
-  const [hearts, setHearts] = useState<{ id: number; x: number; delay: number }[]>([]);
-
-  const spawnHearts = () => {
-    const newHearts = Array.from({ length: 6 }).map((_, i) => ({
-      id: Date.now() + i,
-      x: Math.random() * 100 - 50, 
-      delay: i * 0.08,             
-    }));
-    
-    setHearts((prev) => [...prev, ...newHearts]);
-    
-    setTimeout(() => {
-      setHearts((prev) => prev.filter((h) => !newHearts.find(nh => nh.id === h.id)));
-    }, 2000);
-  };
-
-  return (
-    <div className="relative inline-block">
-      <AnimatePresence>
-        {hearts.map((heart) => (
-          <motion.div
-            key={heart.id}
-            initial={{ y: 0, opacity: 1, scale: 0.5 }}
-            animate={{ y: -70, opacity: 0, scale: 1.4 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 1.5, ease: "easeOut", delay: heart.delay }}
-            className="absolute left-1/2 -translate-x-1/2 text-pink-500 pointer-events-none"
-            style={{ left: `calc(50% + ${heart.x}px)` }}
-          >
-            <Heart size={18} fill="currentColor" />
-          </motion.div>
-        ))}
-      </AnimatePresence>
-
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => {
-          spawnHearts();
-          onClick();
-        }}
-        onMouseEnter={spawnHearts}
-        className="
-          bg-pink-50 border-pink-200 text-pink-600 font-bold
-          hover:bg-pink-100 hover:border-pink-300 hover:text-pink-700
-          shadow-[0_0_10px_rgba(252,231,243,0.8)]
-          transition-all duration-300 group rounded-full px-5
-        "
-      >
-        <Heart size={14} className="mr-2 fill-pink-500 group-hover:animate-pulse" />
-        {label.replace('_', ' ')}
-      </Button>
-    </div>
-  );
-}
 
 export default function SharedHeader() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+
+  const links = user ? [...NAV_LINKS, { label: 'Dashboard', path: '/dashboard' }] : NAV_LINKS;
 
   return (
-    <nav className="relative z-50 flex justify-between items-center px-8 py-6 max-w-7xl mx-auto">
-      <Link to="/">
-        <img src="/cardlify.png" alt="Cardlify Logo" className="h-auto w-40" />
-      </Link>
+    <header className="sticky top-0 z-50 border-b border-foreground/10 bg-background/80 backdrop-blur-xl">
+      <div className="mx-auto flex h-[76px] max-w-[1400px] items-center justify-between px-5 sm:px-6">
+        <Link to="/" aria-label="Cardlify home" className="shrink-0">
+          <Wordmark />
+        </Link>
 
-      <div className="flex items-center gap-4 text-sm font-semibold">
-        {user ? (
-          <>
-            {NAV_LINKS.map((link) => {
-              if (link.label === 'Lovely_Peoples') {
-                return (
-                  <LovelyButton
-                    key={link.label}
-                    label={link.label}
-                    onClick={() => navigate(link.path)}
-                  />
-                );
+        <nav className="hidden items-center gap-1 rounded-full border border-foreground/10 bg-white/50 p-1.5 md:flex">
+          {links.map((link) => (
+            <NavLink
+              key={link.path}
+              to={link.path}
+              end={link.path === '/'}
+              className={({ isActive }) =>
+                cn(
+                  'rounded-full px-4 py-2 text-[13px] font-medium transition-colors',
+                  isActive
+                    ? 'bg-foreground text-paper'
+                    : 'text-foreground/60 hover:bg-foreground/[0.06] hover:text-foreground',
+                )
               }
+            >
+              {link.label}
+            </NavLink>
+          ))}
+        </nav>
 
-              return (
-                <Button
-                  key={link.label}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate(link.path)}
-                  className="text-stone-600 hover:text-pink-500 hover:bg-pink-50/50"
-                >
-                  {link.label}
-                </Button>
-              );
-            })}
-            
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => {
-                signOut();
-                navigate('/');
-              }} 
-              className="ml-2 border-stone-200 hover:bg-stone-50"
-            >
-              Sign Out
-            </Button>
-          </>
-        ) : (
-          <div className="flex items-center gap-6">
-            <Link to="/auth" className="text-stone-500 hover:text-pink-500">Log in</Link>
-            <Button 
-              onClick={() => navigate('/auth')} 
-              className="bg-pink-600 hover:bg-pink-700 text-white rounded-full px-6 shadow-md"
-            >
-              Get Started
-            </Button>
-          </div>
-        )}
+        <div className="hidden items-center gap-2 md:flex">
+          {user ? (
+            <>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/profile')}>
+                Profile
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  await signOut();
+                  navigate('/');
+                }}
+              >
+                Sign out
+              </Button>
+            </>
+          ) : (
+            <>
+              <Link
+                to="/auth"
+                className="px-4 py-2 text-[13px] font-medium text-foreground/60 transition hover:text-foreground"
+              >
+                Log in
+              </Link>
+              <Button size="sm" onClick={() => navigate('/auth')} className="group">
+                Start free
+                <ArrowUpRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </Button>
+            </>
+          )}
+        </div>
+
+        <button
+          type="button"
+          aria-label={open ? 'Close menu' : 'Open menu'}
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+          className="grid h-10 w-10 place-items-center rounded-full border border-foreground/15 md:hidden"
+        >
+          {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+        </button>
       </div>
-    </nav>
+
+      {open && (
+        <div className="border-t border-foreground/10 bg-background px-5 pb-6 pt-4 md:hidden">
+          <div className="flex flex-col">
+            {links.map((link) => (
+              <NavLink
+                key={link.path}
+                to={link.path}
+                onClick={() => setOpen(false)}
+                className={({ isActive }) =>
+                  cn(
+                    'border-b border-foreground/10 py-3 text-lg tracking-tight',
+                    isActive ? 'text-foreground' : 'text-foreground/55',
+                  )
+                }
+              >
+                {link.label}
+              </NavLink>
+            ))}
+          </div>
+          <div className="mt-5 flex gap-2">
+            {user ? (
+              <>
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => { setOpen(false); navigate('/profile'); }}>
+                  Profile
+                </Button>
+                <Button
+                  size="sm"
+                  className="flex-1"
+                  onClick={async () => {
+                    setOpen(false);
+                    await signOut();
+                    navigate('/');
+                  }}
+                >
+                  Sign out
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => { setOpen(false); navigate('/auth'); }}>
+                  Log in
+                </Button>
+                <Button size="sm" className="flex-1" onClick={() => { setOpen(false); navigate('/auth'); }}>
+                  Start free
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      <ScrollProgress />
+    </header>
   );
 }

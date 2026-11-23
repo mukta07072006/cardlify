@@ -5,28 +5,30 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap pixel-rounded pixel-font text-xs tracking-wider ring-offset-white pixel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:pixel-click hover:pixel-hover pixel-border pixel-shadow",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium tracking-tight transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-45 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: 
-          "bg-rose-600 text-white border-rose-800 hover:bg-rose-700 hover:border-rose-900",
-        destructive: 
-          "bg-red-500 text-white border-red-700 hover:bg-red-600 hover:border-red-800",
-        outline: 
-          "border-2 border-rose-500 bg-white text-rose-700 hover:bg-rose-100 hover:border-rose-600",
-        secondary: 
-          "bg-rose-200 text-rose-900 border-rose-400 hover:bg-rose-300 hover:border-rose-500",
-        ghost: 
-          "text-slate-600 border-transparent hover:bg-rose-100 hover:border-rose-300 hover:text-rose-700",
-        link: 
-          "text-rose-600 border-transparent underline-offset-4 hover:underline hover:text-rose-700",
+        default:
+          "bg-primary text-primary-foreground hover:bg-primary/90 hover:-translate-y-0.5 shadow-[0_18px_30px_-24px_rgba(20,19,15,0.9)]",
+        destructive:
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90 hover:-translate-y-0.5",
+        outline:
+          "border border-foreground/15 bg-transparent text-foreground hover:border-foreground/40 hover:bg-foreground/[0.04] hover:-translate-y-0.5",
+        secondary:
+          "bg-lilac text-foreground hover:bg-lilac/80 hover:-translate-y-0.5",
+        accent:
+          "bg-lime text-foreground hover:bg-lime/85 hover:-translate-y-0.5",
+        ghost:
+          "text-foreground/70 hover:bg-foreground/[0.06] hover:text-foreground",
+        link:
+          "text-foreground underline-offset-4 hover:underline p-0 h-auto",
       },
       size: {
-        default: "h-12 px-6 py-3",
-        sm: "h-10 px-4 py-2 text-[10px]",
-        lg: "h-14 px-8 py-4 text-sm",
-        icon: "h-12 w-12",
+        default: "h-11 px-6 text-sm",
+        sm: "h-9 px-4 text-xs",
+        lg: "h-14 px-8 text-base",
+        icon: "h-11 w-11",
       },
     },
     defaultVariants: {

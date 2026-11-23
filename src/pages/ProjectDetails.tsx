@@ -3,9 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Eyebrow, Wordmark } from '@/components/studio';
 import { toast } from 'sonner';
 import { generateProjectSlug } from '@/lib/urlUtils';
 import { 
@@ -21,7 +20,8 @@ import {
   ToggleRight,
   RefreshCw,
   FileSpreadsheet,
-  FileText
+  FileText,
+  ClipboardList
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -46,10 +46,16 @@ import {
 interface Project {
   id: string;
   project_name: string;
-  template_image_url: string;
+  template_image_url: string | null;
   status: string;
   created_at: string;
+  project_mode: string | null;
+  form_title: string | null;
+  form_description: string | null;
 }
+
+// Columns that only exist for the legacy card flow — never useful in an export.
+const LEGACY_EXPORT_COLUMNS = ['id', 'project_id', 'field_values', 'participant_id', 'department', 'role'];
 
 interface SubmissionSummary {
   id: string;
@@ -167,8 +173,8 @@ export default function ProjectDetails() {
         return;
       }
 
-      const headers = Object.keys(fullSubmissions[0]).filter(key => 
-        !['id', 'project_id', 'field_values'].includes(key)
+      const headers = Object.keys(fullSubmissions[0]).filter(key =>
+        !LEGACY_EXPORT_COLUMNS.includes(key)
       );
       
       let allHeaders = [...headers];
@@ -236,7 +242,7 @@ export default function ProjectDetails() {
       table.style.width = '100%';
       table.style.borderCollapse = 'collapse';
       
-      const headers = Object.keys(fullSubmissions[0]).filter(key => !['id', 'project_id', 'field_values'].includes(key));
+      const headers = Object.keys(fullSubmissions[0]).filter(key => !LEGACY_EXPORT_COLUMNS.includes(key));
       let allHeaders = [...headers];
       fullSubmissions.forEach(sub => {
         if (sub.field_values) Object.keys(sub.field_values).forEach(k => { if(!allHeaders.includes(k)) allHeaders.push(k) });
@@ -284,155 +290,261 @@ export default function ProjectDetails() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f4f4f0]">
-        <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-7 w-7 animate-spin text-foreground/40" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f4f0] text-stone-900 font-mono uppercase selection:bg-rose-500 selection:text-white pb-20">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-        .font-pixel { font-family: 'Press Start 2P', monospace; }
-        .pixel-card { border: 4px solid black; background: white; box-shadow: 6px 6px 0px 0px black; }
-        .pixel-input { border: 2px solid black; border-radius: 0; }
-      `}</style>
-
-      {/* Header */}
-      <header className="bg-white border-b-4 border-black sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="border-2 border-transparent hover:border-black rounded-none">
-              <ArrowLeft className="w-5 h-5" />
+    <div className="min-h-screen bg-background pb-24">
+      <header className="sticky top-0 z-50 border-b border-foreground/10 bg-background/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-[76px] max-w-[1400px] items-center justify-between gap-4 px-5 sm:px-6">
+          <div className="flex min-w-0 items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Back to dashboard"
+              onClick={() => navigate('/dashboard')}
+              className="shrink-0"
+            >
+              <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div className="hidden md:block">
-              <h1 className="font-pixel text-xs truncate max-w-[200px]">{project?.project_name}</h1>
-              <div className="flex gap-2 mt-1">
-                <Badge className={`rounded-none font-pixel text-[8px] ${project?.status === 'active' ? 'bg-green-500' : 'bg-stone-400'}`}>
-                  {project?.status}
-                </Badge>
-                <span className="text-[10px] text-stone-400 font-bold">VER: 1.0.4</span>
-              </div>
+            <Link to="/" className="hidden shrink-0 sm:block">
+              <Wordmark className="text-[1.1rem]" />
+            </Link>
+            <span className="hidden h-5 w-px bg-foreground/15 sm:block" />
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-medium tracking-tight">{project?.project_name}</h1>
+              <p className="mono-label mt-0.5 flex items-center gap-2 text-[9px] text-foreground/35">
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    project?.status === 'active' ? 'bg-lime' : 'bg-foreground/25'
+                  }`}
+                />
+                {project?.status}
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={toggleStatus} className="rounded-none border-2 border-black hover:bg-stone-100 hidden sm:flex">
-              {project?.status === 'active' ? <ToggleRight className="mr-2" /> : <ToggleLeft className="mr-2" />}
-              {project?.status === 'active' ? 'DISABLE' : 'ENABLE'}
+          <div className="flex shrink-0 items-center gap-2">
+            <Button variant="outline" size="sm" onClick={toggleStatus} className="hidden sm:inline-flex">
+              {project?.status === 'active' ? (
+                <ToggleRight className="mr-1.5 h-4 w-4" />
+              ) : (
+                <ToggleLeft className="mr-1.5 h-4 w-4" />
+              )}
+              {project?.status === 'active' ? 'Disable' : 'Enable'}
             </Button>
-            <Button onClick={() => navigate(`/project/${projectId}/editor`)} className="rounded-none bg-black text-white hover:bg-stone-800 font-pixel text-[10px] py-6 shadow-[4px_4px_0px_0px_#e11d48]">
-              <Edit className="w-4 h-4 mr-2" />
-              EDITOR
-            </Button>
+            {project?.project_mode === 'both' && (
+              <Button variant="outline" size="sm" onClick={() => navigate(`/project/${projectId}/forms`)}>
+                <ClipboardList className="mr-1.5 h-4 w-4" />
+                Open form
+              </Button>
+            )}
+            {project?.project_mode === 'form' ? (
+              <Button size="sm" onClick={() => navigate(`/project/${projectId}/forms`)}>
+                <ClipboardList className="mr-1.5 h-4 w-4" />
+                Edit form
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => navigate(`/project/${projectId}/editor`)}>
+                <Edit className="mr-1.5 h-4 w-4" />
+                Open editor
+              </Button>
+            )}
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 pt-10 space-y-10">
-        
-        {/* Action Bar */}
-        <div className="grid md:grid-cols-[1fr_auto] gap-6 items-end">
-          <div className="pixel-card p-6">
-            <h2 className="font-pixel text-[10px] mb-4 text-rose-500">SHARE_LINK_GENERATOR</h2>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Input value={formLink} readOnly className="pixel-input font-bold bg-stone-50" />
+      <main className="mx-auto max-w-[1400px] space-y-6 px-5 pt-10 sm:px-6 lg:pt-14">
+        <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
+          <div>
+            <Eyebrow>Project overview</Eyebrow>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <h2 className="display-lg max-w-2xl">{project?.project_name}</h2>
+              <span className="mono-label rounded-full border border-foreground/15 bg-white/60 px-3 py-1.5 text-[9px] text-foreground/50">
+                {project?.project_mode === 'form'
+                  ? 'Form only'
+                  : project?.project_mode === 'both'
+                    ? 'Card + form'
+                    : 'Card only'}
+              </span>
+            </div>
+            <p className="mt-3 text-sm text-foreground/50">
+              Created{' '}
+              {project?.created_at &&
+                new Date(project.created_at).toLocaleDateString(undefined, {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                })}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={exportToCSV}>
+              <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" /> CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportToPDF}>
+              <FileText className="mr-1.5 h-3.5 w-3.5" /> PDF
+            </Button>
+          </div>
+        </div>
+
+        {/* Share link */}
+        <div className="grid gap-5 lg:grid-cols-[1.6fr_1fr]">
+          <div className="rounded-[1.75rem] bg-foreground p-6 text-paper sm:p-8">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="mono-label text-[10px] text-lime">Share link</p>
+                <h3 className="mt-3 font-display text-xl tracking-tight">Send this to your group</h3>
+              </div>
+              <Link2 className="h-5 w-5 text-paper/35" />
+            </div>
+            <p className="mt-3 max-w-md text-sm leading-relaxed text-paper/50">
+              {project?.project_mode === 'form'
+                ? 'Anyone with this link can answer your questions. No account needed.'
+                : 'Anyone with this link can add their details and generate a card. No account needed.'}
+            </p>
+
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+              <Input
+                value={formLink}
+                readOnly
+                className="h-11 rounded-xl border-paper/15 bg-paper/5 font-mono text-xs text-paper/80 focus-visible:ring-lime"
+              />
               <div className="flex gap-2">
-                <Button onClick={() => { navigator.clipboard.writeText(formLink); toast.success('COPIED!'); }} className="rounded-none bg-blue-500 hover:bg-blue-600 border-2 border-black">
-                  <Link2 className="w-4 h-4 mr-2" /> COPY
+                <Button
+                  variant="accent"
+                  className="flex-1 sm:flex-none"
+                  onClick={() => {
+                    navigator.clipboard.writeText(formLink);
+                    toast.success('Link copied');
+                  }}
+                >
+                  Copy link
                 </Button>
-                <Button variant="outline" onClick={() => window.open(formLink, '_blank')} className="rounded-none border-2 border-black hover:bg-stone-100">
-                  <Eye className="w-4 h-4 mr-2" /> PREVIEW
+                <Button
+                  variant="outline"
+                  onClick={() => window.open(formLink, '_blank')}
+                  className="border-paper/20 text-paper hover:border-paper/50 hover:bg-paper/10"
+                >
+                  <Eye className="h-4 w-4" />
+                  <span className="sr-only">Preview form</span>
                 </Button>
               </div>
             </div>
           </div>
 
-          <div className="flex gap-3">
-             <Button onClick={exportToCSV} variant="outline" className="rounded-none border-2 border-black bg-white hover:bg-green-50">
-               <FileSpreadsheet className="w-4 h-4 mr-2 text-green-600" /> CSV
-             </Button>
-             <Button onClick={exportToPDF} variant="outline" className="rounded-none border-2 border-black bg-white hover:bg-rose-50">
-               <FileText className="w-4 h-4 mr-2 text-rose-600" /> PDF
-             </Button>
+          <div className="surface flex flex-col justify-between p-6 sm:p-8">
+            <div>
+              <p className="mono-label text-[10px] text-foreground/40">Submissions</p>
+              <div className="mt-4 flex items-baseline gap-3">
+                <span className="font-display text-5xl tracking-tight">{submissions.length}</span>
+                <span className="text-sm text-foreground/45">
+                  {project?.project_mode === 'form' ? 'responses collected' : 'cards generated'}
+                </span>
+              </div>
+            </div>
+            <div className="mt-6 flex items-center justify-between border-t border-foreground/10 pt-5">
+              <span className="flex items-center gap-2 text-xs text-foreground/45">
+                <Users className="h-3.5 w-3.5" />
+                Private to your account
+              </span>
+              <span className="mono-label text-[9px] text-foreground/30">v1.0.4</span>
+            </div>
           </div>
         </div>
 
-        {/* Submissions Table */}
-        <div className="pixel-card overflow-hidden">
-          <div className="bg-black text-white p-4 flex justify-between items-center">
+        {/* Submissions */}
+        <div className="overflow-hidden rounded-[1.75rem] border border-foreground/10 bg-white/60">
+          <div className="flex items-center justify-between gap-4 border-b border-foreground/10 px-6 py-5">
             <div className="flex items-center gap-3">
-              <Users className="w-5 h-5 text-rose-500" />
-              <h3 className="font-pixel text-[10px]">SUBMISSION_LOG ({submissions.length})</h3>
+              <h3 className="font-display text-lg tracking-tight">Submission log</h3>
+              <span className="mono-label rounded-full border border-foreground/15 px-2.5 py-1 text-[9px] text-foreground/45">
+                {submissions.length}
+              </span>
             </div>
-            <Button variant="ghost" size="sm" onClick={fetchData} className="text-white hover:bg-white/10 rounded-none h-8">
-              <RefreshCw className="w-3 h-3 mr-2" /> REFRESH
+            <Button variant="ghost" size="sm" onClick={fetchData}>
+              <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
             </Button>
           </div>
 
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader className="bg-stone-100">
-                <TableRow className="border-b-2 border-black hover:bg-transparent">
-                  <TableHead className="font-bold text-black border-r-2 border-black">PARTICIPANT_NAME</TableHead>
-                  <TableHead className="font-bold text-black border-r-2 border-black">TIMESTAMP</TableHead>
-                  <TableHead className="font-bold text-black border-r-2 border-black">GEN_OUTPUT</TableHead>
-                  <TableHead className="font-bold text-black text-right">ACTION</TableHead>
+              <TableHeader>
+                <TableRow className="border-b border-foreground/10 hover:bg-transparent">
+                  <TableHead className="mono-label text-[9px] text-foreground/35">Participant</TableHead>
+                  <TableHead className="mono-label text-[9px] text-foreground/35">Submitted</TableHead>
+                  <TableHead className="mono-label text-[9px] text-foreground/35">Card</TableHead>
+                  <TableHead className="mono-label text-right text-[9px] text-foreground/35">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {submissions.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="h-64 text-center">
-                      <div className="flex flex-col items-center opacity-30">
-                        <Users className="w-12 h-12 mb-4" />
-                        <span className="font-pixel text-[8px]">NO_DATA_AVAILABLE_IN_TABLE</span>
+                      <div className="flex flex-col items-center">
+                        <div className="grid h-14 w-14 place-items-center rounded-2xl bg-secondary">
+                          <Users className="h-6 w-6 text-foreground/25" />
+                        </div>
+                        <p className="mt-4 text-sm font-medium">No submissions yet</p>
+                        <p className="mt-1 max-w-xs text-xs leading-relaxed text-foreground/45">
+                          Share the link above. Cards will appear here as people submit.
+                        </p>
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : (
                   submissions.map((sub) => (
-                    <TableRow key={sub.id} className="border-b-2 border-stone-200 hover:bg-rose-50 transition-colors">
-                      <TableCell className="font-bold border-r-2 border-stone-100">{sub.participant_name}</TableCell>
-                      <TableCell className="text-stone-500 text-xs border-r-2 border-stone-100">
+                    <TableRow
+                      key={sub.id}
+                      className="border-b border-foreground/[0.07] transition-colors hover:bg-white/70"
+                    >
+                      <TableCell className="font-medium">{sub.participant_name}</TableCell>
+                      <TableCell className="text-xs text-foreground/45">
                         {new Date(sub.created_at).toLocaleString()}
                       </TableCell>
-                      <TableCell className="border-r-2 border-stone-100">
+                      <TableCell>
                         {sub.generated_card_url ? (
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             size="sm"
-                            className="rounded-none border-2 border-black h-8 bg-white hover:bg-rose-500 hover:text-white transition-all"
                             onClick={() => downloadCard(sub.generated_card_url!, sub.participant_name)}
                           >
-                            <Download className="w-3 h-3 mr-2" /> DL_CARD
+                            <Download className="mr-1.5 h-3.5 w-3.5" /> Download
                           </Button>
                         ) : (
-                          <span className="text-[10px] font-pixel text-amber-600 animate-pulse">PROCESSING...</span>
+                          <span className="mono-label text-[9px] text-foreground/40">Form response</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="hover:bg-rose-100 hover:text-rose-600 rounded-none">
-                              <Trash2 className="w-4 h-4" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Delete submission"
+                              className="text-foreground/35 hover:bg-destructive/10 hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </AlertDialogTrigger>
-                          <AlertDialogContent className="rounded-none border-4 border-black bg-white">
+                          <AlertDialogContent className="rounded-3xl border-foreground/10">
                             <AlertDialogHeader>
-                              <AlertDialogTitle className="font-pixel text-sm">ERASE_SUBMISSION?</AlertDialogTitle>
-                              <AlertDialogDescription className="text-xs font-bold text-stone-500">
-                                TARGET: {sub.participant_name}. THIS ACTION IS PERMANENT.
+                              <AlertDialogTitle className="display-md">Delete submission?</AlertDialogTitle>
+                              <AlertDialogDescription className="text-sm leading-relaxed text-foreground/55">
+                                The card and details for {sub.participant_name} will be removed
+                                permanently.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel className="rounded-none border-2 border-black">CANCEL</AlertDialogCancel>
-                              <AlertDialogAction 
+                              <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
+                              <AlertDialogAction
                                 onClick={() => deleteSubmission(sub.id)}
-                                className="rounded-none bg-rose-600 hover:bg-rose-700 text-white font-pixel text-[10px]"
+                                className="rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
                               >
-                                CONFIRM_ERASE
+                                Delete
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>

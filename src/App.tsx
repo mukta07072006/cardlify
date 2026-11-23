@@ -13,6 +13,7 @@ import NewProject from "./pages/NewProject";
 import TemplateEditor from "./pages/TemplateEditor";
 import ProjectDetails from "./pages/ProjectDetails";
 import SubmissionForm from "./pages/SubmissionForm";
+import FormBuilder from "./pages/FormBuilder";
 import NotFound from "./pages/NotFound";
 import Pricing from "./pages/Pricing";
 import EliteAdmin from "./pages/EliteAdmin";
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="/project/new" element={<NewProject />} />
             <Route path="/project/:projectId" element={<ProjectDetails />} />
             <Route path="/project/:projectId/editor" element={<TemplateEditor />} />
+            <Route path="/project/:projectId/forms" element={<FormBuilder />} />
             <Route path="/submit/:projectId" element={<SubmissionForm />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/templates" element={<Templates />} />

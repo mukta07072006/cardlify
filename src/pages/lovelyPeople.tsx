@@ -3,10 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Search, Download, Loader2, ArrowRight, Heart, Sparkles } from 'lucide-react';
+import { Search, Download, Loader2, Heart, Instagram } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
-import { Instagram } from 'lucide-react'; 
-import { motion } from 'framer-motion';
+import SharedHeader from '@/components/SharedHeader';
+import { Eyebrow, StudioFooter } from '@/components/studio';
 
 interface LovelyPerson {
   id: number;
@@ -130,188 +130,141 @@ export default function LovelyPeople() {
     }
   };
   return (
-    <div className="min-h-screen bg-[#fffafa] text-black font-mono lowercase selection:bg-rose-500 selection:text-white">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-        .font-pixel { font-family: 'Press Start 2P', cursive; }
-        
-        .list-row {
-          border-bottom: 2px solid #ffe4e6;
-          transition: all 0.2s;
-        }
-        .list-row:hover {
-          background-color: #fff1f2;
-          border-bottom: 2px solid #f43f5e;
-        }
-        
-        .pixel-btn-pink {
-          border: 3px solid black;
-          background: #f43f5e;
-          color: white;
-          font-family: 'Press Start 2P', cursive;
-          font-size: 8px;
-          border-radius: 0;
-          box-shadow: 4px 4px 0px 0px black;
-          image-rendering: pixelated;
-        }
-        .pixel-btn-pink:hover {
-          background: black;
-          transform: translate(-2px, -2px);
-          box-shadow: 6px 6px 0px 0px #f43f5e;
-        }
-        .pixel-btn-pink:active {
-          transform: translate(2px, 2px);
-          box-shadow: 0px 0px 0px 0px black;
-        }
+    <div className="min-h-screen bg-background">
+      <SharedHeader />
 
-        .pink-glow {
-          text-shadow: 2px 2px 0px #ffe4e6;
-        }
-        /* Mobile-specific tweaks */
-        @media (max-width: 640px) {
-          .pixel-btn-pink {
-            font-size: 7px;
-            padding-left: 10px;
-            padding-right: 10px;
-          }
-          .font-pixel { font-size: 11px; }
-          .pink-glow { text-shadow: 1px 1px 0px #ffe4e6; }
-          .list-row { padding-top: 0.75rem; padding-bottom: 0.75rem; }
-        }
-      `}</style>
-
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-20 sm:pt-24 pb-32 relative z-10">
-        
-        {/* Pink Infused Header */}
-        <div className="mb-20 text-center md:text-left">
-          <div className="flex items-center justify-center md:justify-start gap-3 mb-6">
-            <span className="font-pixel text-[8px] tracking-[0.2em] text-rose-500 font-bold uppercase">
-              Follow On Instagram
-            </span>
+      <main className="mx-auto max-w-[1150px] px-5 py-14 sm:px-6 lg:py-20">
+        <div className="flex flex-col justify-between gap-8 md:flex-row md:items-end">
+          <div>
+            <Eyebrow>Certified lovely people</Eyebrow>
+            <h1 className="display-xl mt-5">
+              Lovely
+              <br />
+              <span className="serif text-[1.05em]">people.</span>
+            </h1>
+            <p className="mt-5 max-w-md text-sm leading-relaxed text-foreground/55">
+              Our little wall of favourites. Search a name, generate a card, and keep it forever.
+            </p>
           </div>
 
-          <h1 className="font-pixel text-2xl sm:text-3xl md:text-5xl uppercase mb-12 pink-glow">
-            Lovely <span className="text-rose-500">People</span>
-          </h1>
-          
-          <div className="relative max-w-xl w-full">
-            <div className="absolute inset-0 bg-rose-100 translate-x-1 translate-y-1" />
-            <div className="relative flex items-center gap-3 bg-white border-2 border-black px-3 sm:px-4 py-2 w-full">
-              <Search className="w-5 h-5 text-rose-500" />
-              <Input
-                placeholder="search_the_elite..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="border-none bg-transparent font-pixel text-[9px] h-12 sm:h-14 focus-visible:ring-0 placeholder:text-rose-200 uppercase w-full"
-              />
+          <a
+            href="https://www.instagram.com/cardlify26"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 self-start rounded-full border border-foreground/15 px-4 py-2 text-xs text-foreground/60 transition hover:border-foreground/40 hover:text-foreground"
+          >
+            <Instagram className="h-3.5 w-3.5" />
+            @cardlify26
+          </a>
+        </div>
+
+        <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative w-full max-w-md">
+            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/30" />
+            <Input
+              placeholder="Search a lovely person…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-12 rounded-full border-foreground/15 bg-white/70 pl-11"
+            />
+          </div>
+
+          {isAdmin && (
+            <div className="flex items-center gap-2">
+              {!showAdd ? (
+                <Button size="sm" variant="outline" onClick={() => setShowAdd(true)}>
+                  Add person
+                </Button>
+              ) : (
+                <div className="flex w-full gap-2">
+                  <Input
+                    placeholder="Name"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    className="h-9 rounded-full border-foreground/15 bg-white/70"
+                  />
+                  <Button size="sm" onClick={addPerson} disabled={adding || !newName.trim()}>
+                    {adding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setShowAdd(false);
+                      setNewName('');
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              )}
             </div>
-            {isAdmin && (
-              <div className="mt-3 flex items-center gap-3">
-                {!showAdd ? (
-                  <Button onClick={() => setShowAdd(true)} className="pixel-btn-pink px-3 py-2 text-[10px]">ADD_PERSON</Button>
-                ) : (
-                  <div className="flex w-full gap-2">
-                    <Input
-                      placeholder="NAME"
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      className="bg-white border-2 border-black px-3 py-2 font-pixel text-[9px] uppercase w-full"
-                    />
-                    <Button onClick={addPerson} disabled={adding || !newName.trim()} className="pixel-btn-pink px-3 py-2">
-                      {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : 'SAVE'}
-                    </Button>
-                    <Button onClick={() => { setShowAdd(false); setNewName(''); }} className="px-3 py-2 bg-gray-200 border-2 border-black text-black">CANCEL</Button>
-                  </div>
-                )}
-              </div>
-            )}
+          )}
+        </div>
+
+        <div className="mt-6 overflow-hidden rounded-[1.75rem] border border-foreground/10 bg-white/60">
+          <div className="flex items-center justify-between border-b border-foreground/10 px-6 py-4">
+            <span className="mono-label text-[9px] text-foreground/35">Name</span>
+            <span className="mono-label text-[9px] text-foreground/35">Card</span>
           </div>
-        </div>
 
-        {/* List Header */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 px-4 sm:px-6 py-2 border-b-4 border-black bg-rose-50 font-pixel text-[8px] text-rose-900 uppercase tracking-widest">
-          <span className="col-span-1">NAME_</span>
-          <span className="col-span-1 text-right md:text-right">CARD_</span>
-        </div>
-
-        {/* The Pink List */}
-        <div className="mb-20 bg-white border-x-2 border-black">
           {loading ? (
-            <div className="py-24 text-center">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto text-rose-500 mb-4" />
-              <span className="font-pixel text-[8px] text-rose-300">syncing_with_pink_server...</span>
+            <div className="flex flex-col items-center justify-center py-24">
+              <Loader2 className="h-6 w-6 animate-spin text-foreground/30" />
+              <p className="mono-label mt-4 text-[9px] text-foreground/35">Loading the wall…</p>
             </div>
           ) : people.length === 0 ? (
-            <div className="py-24 text-center border-b-2 border-black border-dashed">
-              <Heart className="w-8 h-8 text-rose-100 mx-auto mb-4" />
-              <span className="font-pixel text-[8px] text-rose-200 uppercase">empty_heart_no_data</span>
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <Heart className="h-7 w-7 text-foreground/20" />
+              <p className="mt-4 text-sm font-medium">Nobody here yet</p>
+              <p className="mt-1 text-xs text-foreground/45">The wall is waiting for its first name.</p>
             </div>
           ) : (
             people
               .filter((p) => p.Name.toLowerCase().includes(search.toLowerCase()))
-              .map((person) => (
-                <div key={person.id} className="list-row flex flex-col md:flex-row items-start md:items-center md:justify-between py-6 px-4 md:px-6 group">
-                  <div className="flex items-center gap-4 w-full md:w-auto">
-                    <div className="w-2 h-2 bg-rose-500 rotate-45 group-hover:scale-150 transition-transform" />
-                    <span className="font-pixel text-[12px] md:text-sm uppercase tracking-tight group-hover:text-rose-600 transition-colors break-words">
-                      {person.Name}
+              .map((person, index) => (
+                <div
+                  key={person.id}
+                  className="group flex items-center justify-between gap-4 border-b border-foreground/[0.07] px-5 py-4 transition-colors last:border-0 hover:bg-white/70 sm:px-6"
+                >
+                  <div className="flex min-w-0 items-center gap-4">
+                    <span className="mono-label w-7 shrink-0 text-[9px] text-foreground/25">
+                      {String(index + 1).padStart(2, '0')}
                     </span>
+                    <span className="truncate font-display text-lg tracking-tight">{person.Name}</span>
                   </div>
 
-                  <div className="w-full md:w-auto mt-4 md:mt-0">
-                    <Button
-                      onClick={() => generateAndDownloadCard(person)}
-                      disabled={processingId === person.id}
-                      className="pixel-btn-pink px-6 h-10 md:h-12 w-full md:w-auto"
-                    >
-                      {processingId === person.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <div className="flex items-center justify-center gap-3">
-                          <Download className="w-4 h-4" />
-                          <span className="hidden md:inline">GENERATE_PASS</span>
-                          <span className="md:hidden">MINT</span>
-                        </div>
-                      )}
-                    </Button>
-                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => generateAndDownloadCard(person)}
+                    disabled={processingId === person.id}
+                    className="shrink-0"
+                  >
+                    {processingId === person.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <>
+                        <Download className="mr-1.5 h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Generate card</span>
+                        <span className="sm:hidden">Card</span>
+                      </>
+                    )}
+                  </Button>
                 </div>
               ))
           )}
         </div>
 
-        {/* Styled Footer */}
-        <div className="flex flex-col md:flex-row justify-between items-center bg-black text-white p-6 font-pixel text-[7px] border-4 border-rose-500 shadow-[8px_8px_0px_0px_rgba(244,63,94,0.3)]">
-          <div className="flex items-center gap-4 mb-4 md:mb-0">
-             <div className="w-2 h-2 bg-rose-500 animate-ping" />
-             <span className="text-white text-[10px]">Total_Lovely_People: <span className='font-bold text-[16px] text-yellow-300'>{people.length}</span></span>
-          </div>
-          <motion.a 
-  href="https://www.instagram.com/cardlify26" 
-  target="_blank" 
-  rel="noopener noreferrer"
-  // Floating animation
-  animate={{ y: [0, -3, 0] }}
-  transition={{ 
-    duration: 3, 
-    repeat: Infinity, 
-    ease: "easeInOut" 
-  }}
-  className="
-    flex items-center gap-1.5 
-    bg-gradient-to-r from-rose-500 to-pink-500 
-    text-white text-[9px] font-bold tracking-wider
-    px-2.5 py-1 rounded-full
-    shadow-[0_0_10px_rgba(244,63,94,0.3)]
-    hover:shadow-[0_0_15px_rgba(244,63,94,0.6)]
-    hover:scale-105 transition-all
-  "
->
-  <Instagram size={10} strokeWidth={3} />
-  <span className="opacity-90">FOLLOW_CARDLIFY</span>
-</motion.a>
+        <div className="mt-6 flex flex-col items-start justify-between gap-3 rounded-2xl border border-foreground/10 bg-lilac/30 px-6 py-4 sm:flex-row sm:items-center">
+          <p className="text-sm text-foreground/60">
+            <span className="font-display text-lg">{people.length}</span> lovely people and counting
+          </p>
+          <p className="mono-label text-[9px] text-foreground/35">Certified by Cardlify</p>
         </div>
       </main>
+
+      <StudioFooter />
     </div>
   );
 }

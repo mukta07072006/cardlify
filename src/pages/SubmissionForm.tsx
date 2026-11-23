@@ -1,21 +1,30 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Wordmark } from '@/components/studio';
 import { toast } from 'sonner';
 import { extractProjectId } from '@/lib/urlUtils';
-import { 
-  Upload, 
-  Loader2, 
+import {
+  ArrowRight,
+  Camera,
+  Loader2,
   Download,
   CheckCircle,
   AlertCircle,
-  User,
-  Sparkles
+  Lock,
+  Sparkles,
 } from 'lucide-react';
+import {
+  emptyAnswer,
+  isAnswerEmpty,
+  normalizeFormField,
+  type FormAnswers,
+  type FormField as FormQuestion,
+  type ProjectMode,
+} from '@/lib/forms';
 
 // Premium Font Library - must match the editor
 const PREMIUM_FONTS = [
@@ -84,9 +93,13 @@ interface Field {
 interface Project {
   id: string;
   project_name: string;
-  template_image_url: string;
+  template_image_url: string | null;
   status: string;
   user_id: string;
+  project_mode?: string | null;
+  form_title?: string | null;
+  form_description?: string | null;
+  form_header_image_url?: string | null;
 }
 
 export default function SubmissionForm() {
@@ -105,8 +118,14 @@ export default function SubmissionForm() {
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [projectMode, setProjectMode] = useState<ProjectMode>('card');
+  const [formQuestions, setFormQuestions] = useState<FormQuestion[]>([]);
+  const [answers, setAnswers] = useState<FormAnswers>({});
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // A project delivers a card when it has artwork and is not form-only
+  const needsCard = projectMode !== 'form' && Boolean(project?.template_image_url);
 
   // Load Google Fonts with canvas preloading
   useEffect(() => {
@@ -268,6 +287,29 @@ export default function SubmissionForm() {
         }
 
         setProject(projectData);
+
+        const mode = ((projectData as { project_mode?: ProjectMode }).project_mode ?? 'card') as ProjectMode;
+        setProjectMode(mode);
+
+        if (mode !== 'card') {
+          const { data: questionRows, error: questionsError } = await supabase
+            .from('form_fields')
+            .select('*')
+            .eq('project_id', actualProjectId)
+            .order('position', { ascending: true })
+            .order('created_at', { ascending: true });
+
+          if (questionsError) throw questionsError;
+
+          const questions = (questionRows || []).map((row) => normalizeFormField(row as never));
+          setFormQuestions(questions);
+
+          const initialAnswers: FormAnswers = {};
+          questions.forEach((question) => {
+            initialAnswers[question.label] = emptyAnswer(question);
+          });
+          setAnswers(initialAnswers);
+        }
 
         // Check if project owner is elite
         const { data: profileData } = await supabase
@@ -695,17 +737,24 @@ export default function SubmissionForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const hasPhotoField = fields.some(f => f.field_type === 'photo');
+    const hasPhotoField = needsCard && fields.some(f => f.field_type === 'photo');
     if (hasPhotoField && !photoFile) {
       toast.error('Please upload a photo');
       return;
     }
 
     // Validate text fields
-    const textFields = fields.filter(f => f.field_type === 'text');
+    const textFields = needsCard ? fields.filter(f => f.field_type === 'text') : [];
     for (const field of textFields) {
       if (!formData[field.field_name]?.trim()) {
         toast.error(`Please fill in ${field.field_name}`);
+        return;
+      }
+    }
+
+    for (const question of formQuestions) {
+      if (question.required && isAnswerEmpty(answers[question.label])) {
+        toast.error(`Please answer “${question.label}”`);
         return;
       }
     }
@@ -739,31 +788,47 @@ export default function SubmissionForm() {
       // Wait to ensure fonts are fully loaded and cached for canvas
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Generate card
-      const cardUrl = await generateCard(photoUrl);
+      // Generate a card only when this project delivers one
+      const cardUrl = needsCard ? await generateCard(photoUrl) : null;
 
-      // Save submission
+      // Merge card layout answers with form answers into flat, export-friendly values
+      const mergedAnswers: Record<string, string> = {};
+      [formData, answers].forEach((source) => {
+        Object.entries(source).forEach(([key, value]) => {
+          mergedAnswers[key] = Array.isArray(value) ? value.join(', ') : value;
+        });
+      });
+
+      const nameQuestion = formQuestions.find((question) => /name/i.test(question.label));
+      const nameAnswer = nameQuestion ? mergedAnswers[nameQuestion.label] : '';
+      const participantName =
+        nameAnswer || mergedAnswers['Name'] || Object.values(mergedAnswers)[0] || 'Anonymous';
+
       const { error: submissionError } = await supabase
         .from('submissions')
         .insert({
           project_id: project!.id,
-          participant_name: formData['Name'] || formData[Object.keys(formData)[0]] || 'Unknown',
-          participant_id: formData['ID'] || null,
-          department: formData['Department'] || null,
-          role: formData['Role'] || null,
+          participant_name: participantName,
+          participant_id: mergedAnswers['ID'] || null,
+          department: mergedAnswers['Department'] || null,
+          role: mergedAnswers['Role'] || null,
           photo_url: photoUrl || null,
           generated_card_url: cardUrl,
-          field_values: formData
+          field_values: mergedAnswers
         });
 
       if (submissionError) throw submissionError;
 
       setGeneratedCardUrl(cardUrl);
       setSubmitted(true);
-      toast.success('Your card has been generated!');
+      toast.success(cardUrl ? 'Your card has been generated!' : 'Your response has been recorded!');
     } catch (error) {
       console.error('Error submitting:', error);
-      toast.error('Failed to generate card. Please try again.');
+      toast.error(
+        needsCard
+          ? 'Failed to generate card. Please try again.'
+          : 'Failed to send your response. Please try again.',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -780,71 +845,134 @@ export default function SubmissionForm() {
     }
   };
 
-  const isFullyLoaded = !loading && fontsLoaded;
+  const isFullyLoaded = !loading && (!needsCard || fontsLoaded);
+  // The form title sits at the very top; the project name becomes the small label above it.
+  const displayTitle = project?.form_title?.trim() || project?.project_name || '';
+  const headerImageUrl = project?.form_header_image_url?.trim() || null;
+
+  const cardTextFields = needsCard ? fields.filter((f) => f.field_type === 'text') : [];
+  const needsPhoto = needsCard && fields.some((f) => f.field_type === 'photo');
+  const questionCount = formQuestions.length + cardTextFields.length + (needsPhoto ? 1 : 0);
+  const minutes = Math.max(1, Math.round(questionCount * 0.4));
+  const cardFieldStart = needsPhoto ? 2 : 1;
+  const questionStart = cardFieldStart + cardTextFields.length;
+
+  // Card-only projects generate a card; anything that also collects answers is a submission.
+  const isCardOnly = needsCard && formQuestions.length === 0;
+  const submitLabel = isCardOnly ? 'Generate my card' : needsCard ? 'Submit' : 'Submit response';
+  const submittingLabel = isCardOnly
+    ? 'Generating your card…'
+    : needsCard
+      ? 'Submitting…'
+      : 'Sending…';
+
+  const topBar = (
+    <div className="sticky top-0 z-40 border-b border-foreground/10 bg-background/80 backdrop-blur-xl">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
+        <Link to="/" aria-label="Cardlify" className="transition hover:opacity-60">
+          <Wordmark />
+        </Link>
+        <span className="mono-label flex items-center gap-2 text-[9px] text-foreground/40">
+          <span className="h-1.5 w-1.5 rounded-full bg-lime" />
+          {project?.status === 'active' ? 'Accepting responses' : 'Closed'}
+        </span>
+      </div>
+    </div>
+  );
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
-        <Loader2 className="w-12 h-12 animate-spin text-blue-600 mb-4" />
-        <p className="text-muted-foreground text-lg">Loading form properties...</p>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-7 bg-background">
+        <Wordmark />
+        <Loader2 className="h-6 w-6 animate-spin text-foreground/30" />
+        <p className="mono-label text-[9px] text-foreground/35">Preparing your form…</p>
       </div>
     );
   }
 
   if (!project) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
-        <Card className="max-w-md w-full shadow-xl">
-          <CardContent className="pt-6 text-center">
-            <AlertCircle className="w-16 h-16 mx-auto text-red-500 mb-4" />
-            <h2 className="text-2xl font-bold mb-2">Form Not Available</h2>
-            <p className="text-muted-foreground">
-              This submission form is currently not active or doesn't exist.
-            </p>
-          </CardContent>
-        </Card>
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="surface max-w-md p-8 text-center">
+          <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-secondary">
+            <AlertCircle className="h-6 w-6 text-foreground/40" />
+          </div>
+          <h2 className="display-md mt-5">This form is closed</h2>
+          <p className="mt-3 text-sm leading-relaxed text-foreground/50">
+            The submission form is not active or no longer exists. Ask the organiser for a fresh
+            link.
+          </p>
+          <a
+            href="/"
+            className="mono-label mt-6 inline-flex text-[9px] text-foreground/45 underline-offset-4 hover:text-foreground hover:underline"
+          >
+            Cardlify studio
+          </a>
+        </div>
       </div>
     );
   }
 
   if (submitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
-        <Card className="max-w-2xl w-full shadow-2xl animate-fade-in">
-          <CardContent className="pt-8 pb-8 text-center">
-            <div className="mb-6">
-              <div className="w-20 h-20 mx-auto bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mb-4 animate-bounce">
-                <CheckCircle className="w-12 h-12 text-white" />
-              </div>
-              <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Card Generated Successfully!
-              </h2>
-              <p className="text-muted-foreground text-lg">
-                Your personalized card is ready to download
-              </p>
-            </div>
-            
-            {generatedCardUrl && (
-              <div className="mb-8">
-                <img 
-                  src={generatedCardUrl} 
-                  alt="Generated Card" 
-                  className="max-w-full rounded-xl shadow-2xl mx-auto border-4 border-white"
-                  style={{ maxHeight: '500px' }}
+      <div className="min-h-screen bg-background">
+        {topBar}
+
+        <div className="mx-auto flex max-w-3xl flex-col items-center px-5 py-14 sm:px-8 sm:py-20">
+          <div className="grid h-20 w-20 place-items-center rounded-full bg-lime shadow-[0_24px_60px_-28px_hsl(var(--lime))]">
+            <CheckCircle className="h-9 w-9 text-foreground" strokeWidth={1.75} />
+          </div>
+
+          <span className="mono-label mt-7 inline-flex items-center gap-2 rounded-full border border-foreground/15 bg-white/60 px-3 py-1.5 text-[9px] text-foreground/45">
+            {generatedCardUrl ? 'Card ready' : 'Response recorded'}
+          </span>
+
+          <h2 className="display-lg mt-5 text-center">
+            {generatedCardUrl ? (
+              <>
+                Looking <span className="serif text-[1.05em]">good.</span>
+              </>
+            ) : (
+              <>
+                Thank <span className="serif text-[1.05em]">you.</span>
+              </>
+            )}
+          </h2>
+          <p className="mt-4 max-w-md text-center text-sm leading-relaxed text-foreground/55">
+            {generatedCardUrl
+              ? `Your personalised card for ${project.project_name} is ready — download it, save it, share it.`
+              : `Your answers are with the organiser of ${project.project_name}. You can close this tab.`}
+          </p>
+
+          {generatedCardUrl && (
+            <>
+              <div className="mt-9 w-full max-w-md overflow-hidden rounded-[1.75rem] border border-foreground/10 bg-white/70 p-3 shadow-[0_30px_80px_-50px_hsl(var(--ink))]">
+                <img
+                  src={generatedCardUrl}
+                  alt="Generated card"
+                  className="mx-auto max-w-full rounded-2xl"
+                  style={{ maxHeight: '480px' }}
                 />
               </div>
-            )}
 
-            <Button 
-              onClick={downloadCard} 
-              size="lg" 
-              className="w-full max-w-md bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-lg py-6"
-            >
-              <Download className="w-6 h-6 mr-2" />
-              Download Your Card
-            </Button>
-          </CardContent>
-        </Card>
+              <Button onClick={downloadCard} size="lg" className="mt-6 w-full max-w-md rounded-full">
+                <Download className="h-4 w-4" />
+                Download your card
+              </Button>
+
+              <p className="mono-label mt-4 text-[9px] text-foreground/35">
+                Save it to your phone · share it anywhere
+              </p>
+            </>
+          )}
+
+          <Link
+            to="/"
+            className="mono-label mt-10 text-[9px] text-foreground/40 underline-offset-4 transition hover:text-foreground hover:underline"
+          >
+            Made with Cardlify
+          </Link>
+        </div>
 
         <canvas ref={canvasRef} className="hidden" />
       </div>
@@ -852,121 +980,143 @@ export default function SubmissionForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-12 px-4">
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-10">
-          <div className="flex items-center justify-center gap-2 mb-6">
-            <div className="relative">
-              <img 
-                src="/cardlify.png" 
-                alt="Cardlify Logo" 
-                className="h-12 object-contain"
-              />
-              <Sparkles className="absolute -top-1 -right-1 w-5 h-5 text-yellow-500 animate-pulse" />
-            </div>
-          </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-3">
-            {project.project_name}
-          </h1>
-          <p className="text-muted-foreground text-lg">
-            Fill in your details to generate your personalized card
-          </p>
-          
-          {/* Loading Banner */}
-          {!isFullyLoaded && (
-            <div className="mt-6 mx-auto max-w-md bg-amber-50 border-2 border-amber-200 rounded-lg p-4 flex items-center gap-3 animate-pulse">
-              <Loader2 className="w-5 h-5 animate-spin text-amber-600 flex-shrink-0" />
-              <div className="text-left">
-                <p className="font-semibold text-amber-900 text-sm">
-                  {loading ? 'Loading Form Properties' : 'Loading Fonts for Canvas'}
-                </p>
-                <p className="text-xs text-amber-700">
-                  {loading 
-                    ? 'Fetching template configuration...' 
-                    : 'Loading 22 premium fonts, please wait...'}
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+    <div className="min-h-screen bg-background">
+      {topBar}
 
-        {/* Form Card */}
-        <Card className="shadow-2xl border-2">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50">
-            <CardTitle className="text-2xl">Your Information</CardTitle>
-            <CardDescription className="text-base">
-              Please provide the required details below
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Photo Upload */}
-              {fields.some(f => f.field_type === 'photo') && (
-                <div className="space-y-3">
-                  <Label className="text-base font-semibold">Your Photo *</Label>
-                  <div className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${
-                    isFullyLoaded 
-                      ? 'border-blue-300 bg-blue-50/50 hover:bg-blue-50' 
-                      : 'border-gray-300 bg-gray-50 opacity-60 cursor-not-allowed'
-                  }`}>
+      <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
+        {headerImageUrl && (
+          <div className="overflow-hidden rounded-[2rem] border border-foreground/10 bg-white/50 shadow-[0_24px_70px_-56px_hsl(var(--ink))]">
+            <img
+              src={headerImageUrl}
+              alt={`${displayTitle} header`}
+              className="h-44 w-full object-cover sm:h-64"
+            />
+          </div>
+        )}
+
+        <div
+          className={`grid gap-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-12 ${
+            headerImageUrl ? 'mt-10' : ''
+          }`}
+        >
+          <div className="lg:sticky lg:top-24 lg:self-start">
+            <span className="mono-label inline-flex items-center gap-2 rounded-full border border-foreground/15 bg-white/50 px-3 py-1.5 text-[9px] text-foreground/50">
+              {project.project_name}
+              <span className="h-1 w-1 rounded-full bg-foreground/25" />
+              {needsCard ? (formQuestions.length ? 'form + card' : 'card pickup') : 'form'}
+            </span>
+
+            <h1 className="display-lg mt-6">{displayTitle}</h1>
+            <p className="mt-5 max-w-md text-sm leading-relaxed text-foreground/60">
+              {project.form_description ||
+                (needsCard
+                  ? 'Add your details below and your personalised card is generated instantly. No account, no waiting.'
+                  : 'Answer a few questions below. Your organiser sees the responses right away.')}
+            </p>
+
+            <div className="mt-7 flex flex-wrap gap-2">
+              <span className="mono-label rounded-full bg-lilac/60 px-3 py-1.5 text-[9px] text-foreground/60">
+                {questionCount} {questionCount === 1 ? 'question' : 'questions'}
+              </span>
+              <span className="mono-label rounded-full bg-secondary px-3 py-1.5 text-[9px] text-foreground/55">
+                ~{minutes} min
+              </span>
+              <span className="mono-label rounded-full bg-lime/60 px-3 py-1.5 text-[9px] text-foreground/60">
+                No account needed
+              </span>
+            </div>
+
+            {!isFullyLoaded && (
+              <div className="mt-7 flex max-w-md items-center gap-3 rounded-2xl border border-foreground/10 bg-lilac/30 p-4 text-left">
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-foreground/50" />
+                <div>
+                  <p className="text-sm font-medium">
+                    {loading ? 'Loading form properties' : 'Loading fonts for the card'}
+                  </p>
+                  <p className="mt-0.5 text-xs text-foreground/45">
+                    {loading
+                      ? 'Fetching the template configuration…'
+                      : 'Getting 22 premium fonts ready…'}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="surface p-5 sm:p-8">
+            <div className="flex items-center justify-between border-b border-foreground/10 pb-4">
+              <span className="mono-label text-[9px] text-foreground/40">Your answers</span>
+              <span className="mono-label text-[9px] text-foreground/30">Step 1 of 1</span>
+            </div>
+
+            <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+              {needsPhoto && (
+                <div className="rounded-2xl border border-foreground/10 bg-white/55 p-4 transition focus-within:border-foreground/25 focus-within:bg-white/80 sm:p-5">
+                  <Label className="flex items-start gap-2.5 text-sm font-medium leading-snug tracking-tight text-foreground">
+                    <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-foreground/[0.06] text-[10px] font-medium text-foreground/50">
+                      01
+                    </span>
+                    <span>
+                      Your photo <span className="text-coral">*</span>
+                    </span>
+                  </Label>
+
+                  <div className="mt-3">
                     {photoPreview ? (
-                      <div className="space-y-4">
-                        <img 
-                          src={photoPreview} 
-                          alt="Preview" 
-                          className="w-40 h-40 rounded-full object-cover mx-auto border-4 border-white shadow-lg"
+                      <div className="flex items-center gap-4 rounded-2xl border border-foreground/10 bg-white/70 p-3">
+                        <img
+                          src={photoPreview}
+                          alt="Your photo preview"
+                          className="h-20 w-20 rounded-full border border-foreground/10 object-cover"
                         />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setPhotoFile(null);
-                            setPhotoPreview(null);
-                          }}
-                          disabled={!isFullyLoaded}
-                          className="hover:bg-red-50 hover:text-red-600 hover:border-red-300"
-                        >
-                          Change Photo
-                        </Button>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-foreground/70">Photo added</p>
+                          <p className="mt-0.5 text-[11px] text-foreground/40">Looks good?</p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="mt-2 rounded-full"
+                            onClick={() => {
+                              setPhotoFile(null);
+                              setPhotoPreview(null);
+                            }}
+                            disabled={!isFullyLoaded}
+                          >
+                            Change photo
+                          </Button>
+                        </div>
                       </div>
                     ) : (
-                      <label className={`block ${isFullyLoaded ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
-                        <div className="flex flex-col items-center gap-4">
-                          <div className={`w-20 h-20 rounded-full flex items-center justify-center ${
-                            isFullyLoaded 
-                              ? 'bg-gradient-to-r from-blue-500 to-purple-500' 
-                              : 'bg-gray-300'
-                          }`}>
-                            <User className={`w-10 h-10 ${isFullyLoaded ? 'text-white' : 'text-gray-500'}`} />
-                          </div>
-                          <div>
-                            <p className={`font-semibold text-lg ${isFullyLoaded ? 'text-foreground' : 'text-gray-400'}`}>
-                              {isFullyLoaded ? 'Upload your photo' : 'Please wait...'}
-                            </p>
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {isFullyLoaded ? 'JPG or PNG, max 5MB' : 'Loading properties'}
-                            </p>
-                          </div>
-                          <span className={`inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium h-10 px-6 ${
-                            isFullyLoaded 
-                              ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white pointer-events-none' 
-                              : 'bg-gray-300 text-gray-500 pointer-events-none'
-                          }`}>
-                            {isFullyLoaded ? (
-                              <>
-                                <Upload className="w-4 h-4" />
-                                Choose Photo
-                              </>
-                            ) : (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Loading...
-                              </>
-                            )}
-                          </span>
+                      <label
+                        className={`flex cursor-pointer items-center gap-4 rounded-2xl border border-dashed px-4 py-5 transition ${
+                          isFullyLoaded
+                            ? 'border-foreground/20 bg-background/40 hover:border-foreground/40 hover:bg-white/70'
+                            : 'cursor-not-allowed border-foreground/10 bg-background/30 opacity-60'
+                        }`}
+                      >
+                        <div
+                          className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ${
+                            isFullyLoaded ? 'bg-lilac/70' : 'bg-secondary'
+                          }`}
+                        >
+                          {isFullyLoaded ? (
+                            <Camera className="h-5 w-5 text-foreground/50" />
+                          ) : (
+                            <Loader2 className="h-5 w-5 animate-spin text-foreground/40" />
+                          )}
                         </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">
+                            {isFullyLoaded ? 'Upload your photo' : 'Please wait…'}
+                          </p>
+                          <p className="mt-0.5 text-xs text-foreground/45">
+                            {isFullyLoaded ? 'A clear face photo works best · JPG or PNG, max 5MB' : 'Loading properties'}
+                          </p>
+                        </div>
+                        <span className="mono-label ml-auto hidden shrink-0 rounded-full border border-foreground/15 px-3 py-1.5 text-[9px] text-foreground/50 sm:block">
+                          Browse
+                        </span>
                         <input
                           type="file"
                           accept="image/png,image/jpeg"
@@ -980,79 +1130,224 @@ export default function SubmissionForm() {
                 </div>
               )}
 
-              {/* Text Fields */}
-              {fields
-                .filter(f => f.field_type === 'text')
-                .map((field) => (
-                  <div key={field.id} className="space-y-2">
-                    <Label htmlFor={field.id} className="text-base font-semibold">
-                      {field.field_name} *
-                    </Label>
-                    <Input
-                      id={field.id}
-                      placeholder={isFullyLoaded ? `Enter your ${field.field_name.toLowerCase()}` : 'Please wait...'}
-                      value={formData[field.field_name] || ''}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        [field.field_name]: e.target.value
-                      })}
-                      maxLength={100}
-                      className="h-12 text-base"
-                      disabled={!isFullyLoaded}
-                    />
-                  </div>
-                ))}
-
-              {/* Submit Button / Loading Message */}
-              {!isFullyLoaded ? (
-                <div className="w-full bg-gradient-to-r from-gray-400 to-gray-500 text-white text-lg py-6 rounded-lg flex items-center justify-center gap-3 cursor-not-allowed">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span className="font-medium">Please wait, properties loading...</span>
-                </div>
-              ) : (
-                <Button 
-                  type="submit" 
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-lg py-6" 
-                  size="lg" 
-                  disabled={submitting}
+              {cardTextFields.map((field, index) => (
+                <div
+                  key={field.id}
+                  className="rounded-2xl border border-foreground/10 bg-white/55 p-4 transition focus-within:border-foreground/25 focus-within:bg-white/80 sm:p-5"
                 >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Generating Your Card...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-5 h-5 mr-2" />
-                      Generate My Card
-                    </>
-                  )}
-                </Button>
-              )}
-            </form>
-          </CardContent>
-        </Card>
+                  <Label
+                    htmlFor={field.id}
+                    className="flex items-start gap-2.5 text-sm font-medium leading-snug tracking-tight text-foreground"
+                  >
+                    <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-foreground/[0.06] text-[10px] font-medium text-foreground/50">
+                      {String(index + cardFieldStart).padStart(2, '0')}
+                    </span>
+                    <span>
+                      {field.field_name} <span className="text-coral">*</span>
+                    </span>
+                  </Label>
+                  <Input
+                    id={field.id}
+                    placeholder={
+                      isFullyLoaded ? `Enter your ${field.field_name.toLowerCase()}` : 'Please wait…'
+                    }
+                    value={formData[field.field_name] || ''}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        [field.field_name]: e.target.value,
+                      })
+                    }
+                    maxLength={100}
+                    className="mt-3 h-12 rounded-xl border-foreground/15 bg-white/80 transition placeholder:text-foreground/30 focus-visible:ring-4 focus-visible:ring-lilac/50"
+                    disabled={!isFullyLoaded}
+                  />
+                </div>
+              ))}
 
-        {/* Hidden Canvas */}
-        <canvas ref={canvasRef} className="hidden" />
+              {formQuestions.map((question, index) => {
+                const value = answers[question.label];
+                const update = (next: string | string[]) =>
+                  setAnswers({ ...answers, [question.label]: next });
 
-        {/* Font Preloader - renders all fonts in DOM to ensure they're cached */}
-        <div className="hidden" aria-hidden="true">
-          {PREMIUM_FONTS.map(font => 
-            font.weights.map(weight => (
-              <div 
-                key={`${font.name}-${weight}`}
-                style={{ 
-                  fontFamily: font.name, 
-                  fontWeight: weight,
-                  fontSize: '16px'
-                }}
-              >
-                Font Preload: {font.name} {weight}
+                return (
+                  <div
+                    key={question.id}
+                    className="rounded-2xl border border-foreground/10 bg-white/55 p-4 transition focus-within:border-foreground/25 focus-within:bg-white/80 sm:p-5"
+                  >
+                    <Label
+                      htmlFor={`q-${question.id}`}
+                      className="flex items-start gap-2.5 text-sm font-medium leading-snug tracking-tight text-foreground"
+                    >
+                      <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-foreground/[0.06] text-[10px] font-medium text-foreground/50">
+                        {String(index + questionStart).padStart(2, '0')}
+                      </span>
+                      <span>
+                        {question.label}
+                        {question.required && <span className="ml-1 text-coral">*</span>}
+                      </span>
+                    </Label>
+
+                    {(question.field_type === 'short_text' ||
+                      question.field_type === 'email' ||
+                      question.field_type === 'number' ||
+                      question.field_type === 'date') && (
+                      <Input
+                        id={`q-${question.id}`}
+                        type={
+                          question.field_type === 'email'
+                            ? 'email'
+                            : question.field_type === 'number'
+                              ? 'number'
+                              : question.field_type === 'date'
+                                ? 'date'
+                                : 'text'
+                        }
+                        placeholder={question.placeholder || undefined}
+                        value={typeof value === 'string' ? value : ''}
+                        onChange={(e) => update(e.target.value)}
+                        className="mt-3 h-12 rounded-xl border-foreground/15 bg-white/80 transition placeholder:text-foreground/30 focus-visible:ring-4 focus-visible:ring-lilac/50"
+                        disabled={!isFullyLoaded}
+                      />
+                    )}
+
+                    {question.field_type === 'long_text' && (
+                      <textarea
+                        id={`q-${question.id}`}
+                        rows={4}
+                        placeholder={question.placeholder || undefined}
+                        value={typeof value === 'string' ? value : ''}
+                        onChange={(e) => update(e.target.value)}
+                        className="mt-3 w-full rounded-2xl border border-foreground/15 bg-white/80 px-4 py-3 text-sm outline-none transition placeholder:text-foreground/30 focus:border-foreground/30 focus:ring-4 focus:ring-lilac/50"
+                        disabled={!isFullyLoaded}
+                      />
+                    )}
+
+                    {question.field_type === 'dropdown' && (
+                      <select
+                        id={`q-${question.id}`}
+                        value={typeof value === 'string' ? value : ''}
+                        onChange={(e) => update(e.target.value)}
+                        className="mt-3 h-12 w-full rounded-xl border border-foreground/15 bg-white/80 px-3 text-sm outline-none transition focus:border-foreground/30 focus:ring-4 focus:ring-lilac/50"
+                        disabled={!isFullyLoaded}
+                      >
+                        <option value="">Choose an option…</option>
+                        {question.options.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    {question.field_type === 'radio' && (
+                      <div className="mt-3 space-y-2">
+                        {question.options.map((option) => (
+                          <label
+                            key={option}
+                            className="flex cursor-pointer items-center gap-3 rounded-xl border border-foreground/10 bg-white/60 px-4 py-3 text-sm transition hover:border-foreground/25 hover:bg-white has-[:checked]:border-foreground/40 has-[:checked]:bg-white has-[:checked]:shadow-sm"
+                          >
+                            <input
+                              type="radio"
+                              name={`q-${question.id}`}
+                              checked={value === option}
+                              onChange={() => update(option)}
+                              className="h-4 w-4 accent-foreground"
+                            />
+                            {option}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+
+                    {question.field_type === 'checkbox' && (
+                      <div className="mt-3 space-y-2">
+                        {question.options.map((option) => {
+                          const selected = Array.isArray(value) ? value : [];
+                          return (
+                            <label
+                              key={option}
+                              className="flex cursor-pointer items-center gap-3 rounded-xl border border-foreground/10 bg-white/60 px-4 py-3 text-sm transition hover:border-foreground/25 hover:bg-white has-[:checked]:border-foreground/40 has-[:checked]:bg-white has-[:checked]:shadow-sm"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selected.includes(option)}
+                                onChange={(e) =>
+                                  update(
+                                    e.target.checked
+                                      ? [...selected, option]
+                                      : selected.filter((item) => item !== option),
+                                  )
+                                }
+                                className="h-4 w-4 rounded accent-foreground"
+                              />
+                              {option}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {question.help_text && (
+                      <p className="mt-1.5 text-xs text-foreground/40">{question.help_text}</p>
+                    )}
+                  </div>
+                );
+              })}
+
+              <div className="border-t border-foreground/10 pt-5">
+                {!isFullyLoaded ? (
+                  <div className="flex h-12 w-full cursor-not-allowed items-center justify-center gap-2 rounded-full bg-foreground/15 text-sm text-foreground/50">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Preparing properties…
+                  </div>
+                ) : (
+                  <Button type="submit" size="lg" className="group w-full rounded-full" disabled={submitting}>
+                    {submitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {submittingLabel}
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        {submitLabel}
+                        <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                      </>
+                    )}
+                  </Button>
+                )}
+                <p className="mono-label mt-4 flex items-center justify-center gap-1.5 text-[9px] text-foreground/35">
+                  <Lock className="h-3 w-3" />
+                  Your answers go straight to the organiser
+                </p>
               </div>
-            ))
-          )}
+            </form>
+          </div>
         </div>
+
+        <p className="mono-label mt-10 text-center text-[9px] text-foreground/30">
+          Private by default · organised with Cardlify
+        </p>
+      </div>
+
+      <canvas ref={canvasRef} className="hidden" />
+
+      <div className="hidden" aria-hidden="true">
+        {PREMIUM_FONTS.map((font) =>
+          font.weights.map((weight) => (
+            <div
+              key={`${font.name}-${weight}`}
+              style={{
+                fontFamily: font.name,
+                fontWeight: weight,
+                fontSize: '16px',
+              }}
+            >
+              Font Preload: {font.name} {weight}
+            </div>
+          )),
+        )}
       </div>
     </div>
   );
