@@ -225,12 +225,20 @@
      Old screens still reference these; they now inherit the modern look. */
   .font-pixel,
   .font-pixel-mono,
-  .pixel-font,
-  .pixel-font-secondary {
+  .pixel-font {
     font-family: "JetBrains Mono", ui-monospace, monospace !important;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     font-size: 0.75rem;
+    line-height: 1.5;
+  }
+
+  /* Form inputs: keep the mono texture, but show the characters exactly as typed. */
+  .pixel-font-secondary {
+    font-family: "JetBrains Mono", ui-monospace, monospace !important;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    font-size: 0.875rem;
     line-height: 1.5;
   }
 

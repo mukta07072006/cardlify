@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Eyebrow, Wordmark } from '@/components/studio';
 import { toast } from 'sonner';
 import {
@@ -35,6 +36,9 @@ interface FormProject {
   form_title: string | null;
   form_description: string | null;
   form_header_image_url: string | null;
+  email_notifications_enabled: boolean | null;
+  email_sender_name: string | null;
+  photo_required: boolean | null;
 }
 
 const fieldClass = 'h-12 rounded-xl border-foreground/15 bg-white/70 text-sm';
@@ -46,6 +50,9 @@ interface FormDraft {
   formTitle: string;
   formDescription: string;
   formHeaderImageUrl: string | null;
+  emailNotifications: boolean;
+  emailSenderName: string;
+  photoRequired: boolean;
   fields: FormField[];
   savedAt: number;
 }
@@ -55,12 +62,18 @@ const buildSignature = (
   title: string,
   description: string,
   headerImageUrl: string | null,
+  emailNotifications: boolean,
+  emailSenderName: string,
+  photoRequired: boolean,
   fields: FormField[],
 ) =>
   JSON.stringify({
     title: title.trim(),
     description: description.trim(),
     headerImageUrl: headerImageUrl ?? '',
+    emailNotifications,
+    emailSenderName: emailSenderName.trim(),
+    photoRequired,
     fields: fields.map((field) => [
       field.id,
       field.label.trim(),
@@ -83,6 +96,9 @@ export default function FormBuilder() {
   const [formDescription, setFormDescription] = useState('');
   const [formHeaderImageUrl, setFormHeaderImageUrl] = useState<string | null>(null);
   const [headerUploading, setHeaderUploading] = useState(false);
+  const [emailNotifications, setEmailNotifications] = useState(false);
+  const [emailSenderName, setEmailSenderName] = useState('');
+  const [photoRequired, setPhotoRequired] = useState(true);
   const [fields, setFields] = useState<FormField[]>([]);
   const [originalIds, setOriginalIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,8 +106,24 @@ export default function FormBuilder() {
   const [savedSignature, setSavedSignature] = useState('');
 
   const signature = useMemo(
-    () => buildSignature(formTitle, formDescription, formHeaderImageUrl, fields),
-    [formTitle, formDescription, formHeaderImageUrl, fields],
+    () => buildSignature(
+      formTitle,
+      formDescription,
+      formHeaderImageUrl,
+      emailNotifications,
+      emailSenderName,
+      photoRequired,
+      fields,
+    ),
+    [
+      formTitle,
+      formDescription,
+      formHeaderImageUrl,
+      emailNotifications,
+      emailSenderName,
+      photoRequired,
+      fields,
+    ],
   );
   const dirty = Boolean(project) && signature !== savedSignature;
 
@@ -106,6 +138,9 @@ export default function FormBuilder() {
       formTitle,
       formDescription,
       formHeaderImageUrl,
+      emailNotifications,
+      emailSenderName,
+      photoRequired,
       fields: fields.map((field, index) => ({ ...field, position: index })),
       savedAt: Date.now(),
     };
@@ -114,7 +149,19 @@ export default function FormBuilder() {
     } catch (error) {
       console.warn('Could not keep the form draft:', error);
     }
-  }, [dirty, fields, formDescription, formHeaderImageUrl, formTitle, loading, project, projectId]);
+  }, [
+    dirty,
+    emailNotifications,
+    emailSenderName,
+    photoRequired,
+    fields,
+    formDescription,
+    formHeaderImageUrl,
+    formTitle,
+    loading,
+    project,
+    projectId,
+  ]);
 
   // Plain refreshes and tab closes still deserve a warning while edits are unsaved.
   useEffect(() => {
@@ -140,7 +187,9 @@ export default function FormBuilder() {
     try {
       const { data, error } = await supabase
         .from('projects')
-        .select('id, project_name, project_mode, form_title, form_description, form_header_image_url')
+        .select(
+          'id, project_name, project_mode, form_title, form_description, form_header_image_url, email_notifications_enabled, email_sender_name, photo_required',
+        )
         .eq('id', projectId)
         .single();
 
@@ -162,17 +211,26 @@ export default function FormBuilder() {
       const savedTitle = data.form_title || data.project_name;
       const savedDescription = data.form_description || '';
       const savedHeaderImageUrl = data.form_header_image_url ?? null;
+      const savedEmailNotifications = Boolean(data.email_notifications_enabled);
+      const savedEmailSenderName = data.email_sender_name ?? '';
+      const savedPhotoRequired = data.photo_required !== false;
       const savedIds = new Set(savedFields.map((field) => field.id));
       const savedSignatureValue = buildSignature(
         savedTitle,
         savedDescription,
         savedHeaderImageUrl,
+        savedEmailNotifications,
+        savedEmailSenderName,
+        savedPhotoRequired,
         savedFields,
       );
 
       let nextTitle = savedTitle;
       let nextDescription = savedDescription;
       let nextHeaderImageUrl = savedHeaderImageUrl;
+      let nextEmailNotifications = savedEmailNotifications;
+      let nextEmailSenderName = savedEmailSenderName;
+      let nextPhotoRequired = savedPhotoRequired;
       let nextFields = savedFields;
       let restoredDraft = false;
 
@@ -192,14 +250,32 @@ export default function FormBuilder() {
               draft.formHeaderImageUrl === undefined
                 ? savedHeaderImageUrl
                 : draft.formHeaderImageUrl;
+            const draftEmailNotifications =
+              draft.emailNotifications === undefined
+                ? savedEmailNotifications
+                : Boolean(draft.emailNotifications);
+            const draftEmailSenderName =
+              draft.emailSenderName === undefined ? savedEmailSenderName : draft.emailSenderName;
+            const draftPhotoRequired =
+              draft.photoRequired === undefined ? savedPhotoRequired : Boolean(draft.photoRequired);
 
             if (
-              buildSignature(draftTitle, draftDescription, draftHeaderImageUrl, draftFields) !==
-              savedSignatureValue
+              buildSignature(
+                draftTitle,
+                draftDescription,
+                draftHeaderImageUrl,
+                draftEmailNotifications,
+                draftEmailSenderName,
+                draftPhotoRequired,
+                draftFields,
+              ) !== savedSignatureValue
             ) {
               nextTitle = draftTitle;
               nextDescription = draftDescription;
               nextHeaderImageUrl = draftHeaderImageUrl;
+              nextEmailNotifications = draftEmailNotifications;
+              nextEmailSenderName = draftEmailSenderName;
+              nextPhotoRequired = draftPhotoRequired;
               nextFields = draftFields;
               restoredDraft = true;
             }
@@ -212,6 +288,9 @@ export default function FormBuilder() {
       setFormTitle(nextTitle);
       setFormDescription(nextDescription);
       setFormHeaderImageUrl(nextHeaderImageUrl);
+      setEmailNotifications(nextEmailNotifications);
+      setEmailSenderName(nextEmailSenderName);
+      setPhotoRequired(nextPhotoRequired);
       setFields(nextFields);
       setOriginalIds(savedFields.map((field) => field.id));
       setSavedSignature(savedSignatureValue);
@@ -325,6 +404,9 @@ export default function FormBuilder() {
           form_title: formTitle.trim() || project.project_name,
           form_description: formDescription.trim() || null,
           form_header_image_url: formHeaderImageUrl,
+          email_notifications_enabled: emailNotifications,
+          email_sender_name: emailSenderName.trim() || project.project_name,
+          photo_required: photoRequired,
         })
         .eq('id', project.id);
 
@@ -361,7 +443,17 @@ export default function FormBuilder() {
 
       setOriginalIds(labelled.map((field) => field.id));
       setFields(labelled.map((field) => ({ ...field, persisted: true })));
-      setSavedSignature(buildSignature(formTitle, formDescription, formHeaderImageUrl, labelled));
+      setSavedSignature(
+        buildSignature(
+          formTitle,
+          formDescription,
+          formHeaderImageUrl,
+          emailNotifications,
+          emailSenderName,
+          photoRequired,
+          labelled,
+        ),
+      );
       if (projectId) window.localStorage.removeItem(draftKey(projectId));
       toast.success('Form saved');
     } catch (error) {
@@ -514,6 +606,69 @@ export default function FormBuilder() {
                   disabled={headerUploading}
                 />
               </label>
+            )}
+          </div>
+
+          {project.project_mode === 'both' && (
+            <div className="mt-7 border-t border-foreground/10 pt-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <Label htmlFor="photoRequired" className="mono-label text-foreground/45">
+                    Photo on the card
+                  </Label>
+                  <p className="mt-2 max-w-sm text-xs leading-relaxed text-foreground/50">
+                    {photoRequired
+                      ? 'Required — nobody can submit without a photo.'
+                      : 'Optional — people can submit without a photo, and their card is generated without one.'}
+                  </p>
+                </div>
+                <Switch
+                  id="photoRequired"
+                  checked={photoRequired}
+                  onCheckedChange={setPhotoRequired}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="mt-7 border-t border-foreground/10 pt-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <Label htmlFor="emailNotifications" className="mono-label text-foreground/45">
+                  Confirmation email
+                </Label>
+                <p className="mt-2 max-w-sm text-xs leading-relaxed text-foreground/50">
+                  Everyone who submits gets a branded email with their serial code, based on the
+                  form title.
+                </p>
+              </div>
+              <Switch
+                id="emailNotifications"
+                checked={emailNotifications}
+                onCheckedChange={setEmailNotifications}
+                className="mt-1"
+              />
+            </div>
+
+            {emailNotifications && (
+              <div className="mt-5 space-y-2 rounded-2xl border border-foreground/10 bg-background/40 p-4">
+                <Label htmlFor="emailSenderName" className="mono-label text-foreground/45">
+                  Sender name
+                </Label>
+                <Input
+                  id="emailSenderName"
+                  value={emailSenderName}
+                  onChange={(e) => setEmailSenderName(e.target.value)}
+                  placeholder={project.project_name}
+                  maxLength={60}
+                  className={fieldClass}
+                />
+                <p className="text-[11px] leading-relaxed text-foreground/40">
+                  Sends from admin@cardlify.site as “{emailSenderName.trim() || project.project_name}”.
+                  Replies go to your account email.
+                </p>
+              </div>
             )}
           </div>
         </div>

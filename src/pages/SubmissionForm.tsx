@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Wordmark } from '@/components/studio';
+import { ImageCropper, type CropResult } from '@/components/ImageCropper';
 import { toast } from 'sonner';
 import { extractProjectId } from '@/lib/urlUtils';
+import { createSerialCode, EMAIL_PATTERN } from '@/lib/email';
 import {
   ArrowRight,
   Camera,
@@ -100,6 +102,9 @@ interface Project {
   form_title?: string | null;
   form_description?: string | null;
   form_header_image_url?: string | null;
+  email_notifications_enabled?: boolean | null;
+  email_sender_name?: string | null;
+  photo_required?: boolean | null;
 }
 
 export default function SubmissionForm() {
@@ -118,9 +123,16 @@ export default function SubmissionForm() {
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  // The untouched upload, kept so the visitor can re-frame the square crop.
+  const [photoSource, setPhotoSource] = useState<File | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
   const [projectMode, setProjectMode] = useState<ProjectMode>('card');
   const [formQuestions, setFormQuestions] = useState<FormQuestion[]>([]);
   const [answers, setAnswers] = useState<FormAnswers>({});
+  const [notificationEmail, setNotificationEmail] = useState('');
+  const [submittedSerialCode, setSubmittedSerialCode] = useState<string | null>(null);
+  const [submittedEmail, setSubmittedEmail] = useState('');
+  const [emailFailed, setEmailFailed] = useState(false);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -358,19 +370,27 @@ export default function SubmissionForm() {
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('Photo must be less than 5MB');
-        return;
-      }
+    // Allow picking the same file again after a cancel.
+    e.target.value = '';
+    if (!file) return;
 
-      setPhotoFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file');
+      return;
     }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Photo must be less than 5MB');
+      return;
+    }
+
+    setPhotoSource(file);
+    setCropOpen(true);
+  };
+
+  const handleCropConfirm = (result: CropResult) => {
+    setPhotoFile(result.file);
+    setPhotoPreview(result.dataUrl);
+    setCropOpen(false);
   };
 
   const generateCard = async (photoUrl: string): Promise<string> => {
@@ -738,7 +758,7 @@ export default function SubmissionForm() {
     e.preventDefault();
     
     const hasPhotoField = needsCard && fields.some(f => f.field_type === 'photo');
-    if (hasPhotoField && !photoFile) {
+    if (hasPhotoField && photoRequired && !photoFile) {
       toast.error('Please upload a photo');
       return;
     }
@@ -757,6 +777,11 @@ export default function SubmissionForm() {
         toast.error(`Please answer “${question.label}”`);
         return;
       }
+    }
+
+    if (needsNotificationEmail && !EMAIL_PATTERN.test(notificationEmail.trim())) {
+      toast.error('Please enter an email address for your confirmation');
+      return;
     }
 
     setSubmitting(true);
@@ -799,6 +824,21 @@ export default function SubmissionForm() {
         });
       });
 
+      let recipientEmail = '';
+      if (notificationsEnabled) {
+        if (needsNotificationEmail) {
+          const emailKey = 'Email' in mergedAnswers ? 'Email address' : 'Email';
+          mergedAnswers[emailKey] = notificationEmail.trim();
+        }
+        recipientEmail = Object.values(mergedAnswers).find((value) =>
+          EMAIL_PATTERN.test(value.trim()),
+        ) ?? '';
+      }
+
+      const projectTitle = project!.form_title?.trim() || project!.project_name;
+      const serialCode = notificationsEnabled ? createSerialCode(projectTitle) : null;
+      const submissionId = crypto.randomUUID();
+
       const nameQuestion = formQuestions.find((question) => /name/i.test(question.label));
       const nameAnswer = nameQuestion ? mergedAnswers[nameQuestion.label] : '';
       const participantName =
@@ -807,6 +847,7 @@ export default function SubmissionForm() {
       const { error: submissionError } = await supabase
         .from('submissions')
         .insert({
+          id: submissionId,
           project_id: project!.id,
           participant_name: participantName,
           participant_id: mergedAnswers['ID'] || null,
@@ -814,10 +855,26 @@ export default function SubmissionForm() {
           role: mergedAnswers['Role'] || null,
           photo_url: photoUrl || null,
           generated_card_url: cardUrl,
-          field_values: mergedAnswers
+          field_values: mergedAnswers,
+          serial_code: serialCode,
         });
 
       if (submissionError) throw submissionError;
+
+      if (notificationsEnabled && serialCode && recipientEmail) {
+        try {
+          const { error: mailError } = await supabase.functions.invoke(
+            'send-submission-email',
+            { body: { submissionId } },
+          );
+          if (mailError) throw mailError;
+          setSubmittedSerialCode(serialCode);
+          setSubmittedEmail(recipientEmail);
+        } catch (mailError) {
+          console.error('Confirmation email failed:', mailError);
+          setEmailFailed(true);
+        }
+      }
 
       setGeneratedCardUrl(cardUrl);
       setSubmitted(true);
@@ -850,9 +907,18 @@ export default function SubmissionForm() {
   const displayTitle = project?.form_title?.trim() || project?.project_name || '';
   const headerImageUrl = project?.form_header_image_url?.trim() || null;
 
+  const notificationsEnabled = Boolean(project?.email_notifications_enabled);
+  const hasEmailQuestion =
+    formQuestions.some((question) => question.field_type === 'email') ||
+    (needsCard &&
+      fields.some((field) => field.field_type === 'text' && /e-?mail/i.test(field.field_name)));
+  const needsNotificationEmail = notificationsEnabled && !hasEmailQuestion;
+
   const cardTextFields = needsCard ? fields.filter((f) => f.field_type === 'text') : [];
   const needsPhoto = needsCard && fields.some((f) => f.field_type === 'photo');
-  const questionCount = formQuestions.length + cardTextFields.length + (needsPhoto ? 1 : 0);
+  const photoRequired = project?.photo_required !== false;
+  const questionCount =
+    formQuestions.length + cardTextFields.length + (needsPhoto ? 1 : 0) + (needsNotificationEmail ? 1 : 0);
   const minutes = Math.max(1, Math.round(questionCount * 0.4));
   const cardFieldStart = needsPhoto ? 2 : 1;
   const questionStart = cardFieldStart + cardTextFields.length;
@@ -944,6 +1010,27 @@ export default function SubmissionForm() {
               : `Your answers are with the organiser of ${project.project_name}. You can close this tab.`}
           </p>
 
+          {submittedSerialCode && (
+            <div className="mt-7 w-full max-w-md rounded-2xl border border-foreground/10 bg-white/70 px-6 py-5 text-center">
+              <p className="mono-label text-[9px] text-foreground/40">
+                Sent to {submittedEmail}
+              </p>
+              <p className="mt-2 text-xs text-foreground/50">Your serial code</p>
+              <p className="mt-1 font-mono text-lg font-semibold tracking-[0.24em] text-foreground">
+                {submittedSerialCode}
+              </p>
+              <p className="mt-2 text-[11px] text-foreground/40">
+                Keep it for your records — it's in the email too.
+              </p>
+            </div>
+          )}
+
+          {emailFailed && (
+            <p className="mt-7 max-w-md rounded-2xl border border-foreground/10 bg-white/60 px-4 py-3 text-center text-xs leading-relaxed text-foreground/50">
+              Your answers were saved, but the confirmation email could not be sent.
+            </p>
+          )}
+
           {generatedCardUrl && (
             <>
               <div className="mt-9 w-full max-w-md overflow-hidden rounded-[1.75rem] border border-foreground/10 bg-white/70 p-3 shadow-[0_30px_80px_-50px_hsl(var(--ink))]">
@@ -1007,7 +1094,7 @@ export default function SubmissionForm() {
             </span>
 
             <h1 className="display-lg mt-6">{displayTitle}</h1>
-            <p className="mt-5 max-w-md text-sm leading-relaxed text-foreground/60">
+            <p className="mt-5 max-w-md whitespace-pre-line text-sm leading-relaxed text-foreground/60">
               {project.form_description ||
                 (needsCard
                   ? 'Add your details below and your personalised card is generated instantly. No account, no waiting.'
@@ -1057,7 +1144,14 @@ export default function SubmissionForm() {
                       01
                     </span>
                     <span>
-                      Your photo <span className="text-coral">*</span>
+                      Your photo{' '}
+                      {photoRequired ? (
+                        <span className="text-coral">*</span>
+                      ) : (
+                        <span className="ml-1 rounded-full bg-secondary px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider text-foreground/45">
+                          Optional
+                        </span>
+                      )}
                     </span>
                   </Label>
 
@@ -1071,20 +1165,35 @@ export default function SubmissionForm() {
                         />
                         <div className="min-w-0">
                           <p className="text-xs font-medium text-foreground/70">Photo added</p>
-                          <p className="mt-0.5 text-[11px] text-foreground/40">Looks good?</p>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="mt-2 rounded-full"
-                            onClick={() => {
-                              setPhotoFile(null);
-                              setPhotoPreview(null);
-                            }}
-                            disabled={!isFullyLoaded}
-                          >
-                            Change photo
-                          </Button>
+                          <p className="mt-0.5 text-[11px] text-foreground/40">
+                            Cropped to a square · looks good?
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="rounded-full"
+                              onClick={() => setCropOpen(true)}
+                              disabled={!isFullyLoaded || !photoSource}
+                            >
+                              Crop again
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="rounded-full"
+                              onClick={() => {
+                                setPhotoFile(null);
+                                setPhotoPreview(null);
+                                setPhotoSource(null);
+                              }}
+                              disabled={!isFullyLoaded}
+                            >
+                              Change photo
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -1111,7 +1220,11 @@ export default function SubmissionForm() {
                             {isFullyLoaded ? 'Upload your photo' : 'Please wait…'}
                           </p>
                           <p className="mt-0.5 text-xs text-foreground/45">
-                            {isFullyLoaded ? 'A clear face photo works best · JPG or PNG, max 5MB' : 'Loading properties'}
+                            {isFullyLoaded
+                              ? photoRequired
+                                ? 'A clear face photo works best · JPG or PNG, max 5MB · you can crop it square'
+                                : 'Optional · a clear face photo works best · JPG or PNG, max 5MB'
+                              : 'Loading properties'}
                           </p>
                         </div>
                         <span className="mono-label ml-auto hidden shrink-0 rounded-full border border-foreground/15 px-3 py-1.5 text-[9px] text-foreground/50 sm:block">
@@ -1295,6 +1408,26 @@ export default function SubmissionForm() {
                 );
               })}
 
+              {needsNotificationEmail && (
+                <div className="rounded-2xl border border-foreground/10 bg-lilac/20 p-4 sm:p-5">
+                  <Label htmlFor="notificationEmail" className="text-sm font-medium">
+                    Email address
+                  </Label>
+                  <p className="mt-1 text-xs leading-relaxed text-foreground/45">
+                    We'll send your confirmation and serial code here.
+                  </p>
+                  <Input
+                    id="notificationEmail"
+                    type="email"
+                    value={notificationEmail}
+                    onChange={(event) => setNotificationEmail(event.target.value)}
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                    className="mt-3 h-12 rounded-xl border-foreground/15 bg-white/80"
+                  />
+                </div>
+              )}
+
               <div className="border-t border-foreground/10 pt-5">
                 {!isFullyLoaded ? (
                   <div className="flex h-12 w-full cursor-not-allowed items-center justify-center gap-2 rounded-full bg-foreground/15 text-sm text-foreground/50">
@@ -1319,7 +1452,9 @@ export default function SubmissionForm() {
                 )}
                 <p className="mono-label mt-4 flex items-center justify-center gap-1.5 text-[9px] text-foreground/35">
                   <Lock className="h-3 w-3" />
-                  Your answers go straight to the organiser
+                  {notificationsEnabled
+                    ? 'A confirmation email with your serial code follows'
+                    : 'Your answers go straight to the organiser'}
                 </p>
               </div>
             </form>
@@ -1330,6 +1465,13 @@ export default function SubmissionForm() {
           Private by default · organised with Cardlify
         </p>
       </div>
+
+      <ImageCropper
+        file={photoSource}
+        open={cropOpen}
+        onCancel={() => setCropOpen(false)}
+        onConfirm={handleCropConfirm}
+      />
 
       <canvas ref={canvasRef} className="hidden" />
 

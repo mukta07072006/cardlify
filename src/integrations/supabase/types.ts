@@ -198,10 +198,13 @@ export type Database = {
       projects: {
         Row: {
           created_at: string
+          email_notifications_enabled: boolean
+          email_sender_name: string | null
           form_description: string | null
           form_header_image_url: string | null
           form_title: string | null
           id: string
+          photo_required: boolean
           project_mode: string
           project_name: string
           status: string
@@ -222,10 +225,13 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          email_notifications_enabled?: boolean
+          email_sender_name?: string | null
           form_description?: string | null
           form_header_image_url?: string | null
           form_title?: string | null
           id?: string
+          photo_required?: boolean
           project_mode?: string
           project_name?: string
           status?: string
@@ -238,6 +244,7 @@ export type Database = {
         Row: {
           created_at: string
           department: string | null
+          email_sent_at: string | null
           field_values: Json | null
           generated_card_url: string | null
           id: string
@@ -246,10 +253,12 @@ export type Database = {
           photo_url: string | null
           project_id: string
           role: string | null
+          serial_code: string | null
         }
         Insert: {
           created_at?: string
           department?: string | null
+          email_sent_at?: string | null
           field_values?: Json | null
           generated_card_url?: string | null
           id?: string
@@ -258,10 +267,12 @@ export type Database = {
           photo_url?: string | null
           project_id: string
           role?: string | null
+          serial_code?: string | null
         }
         Update: {
           created_at?: string
           department?: string | null
+          email_sent_at?: string | null
           field_values?: Json | null
           generated_card_url?: string | null
           id?: string

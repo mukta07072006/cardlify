@@ -1,1 +1,6 @@
 project_id = "iqnzfxtfqxksctddjrhk"
+
+# Public form visitors are anonymous; the function verifies the submission and
+# sends at most once per submission, so the gateway does not require a JWT.
+[functions.send-submission-email]
+verify_jwt = false

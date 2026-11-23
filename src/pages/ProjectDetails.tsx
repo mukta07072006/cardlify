@@ -42,6 +42,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Project {
   id: string;
@@ -56,6 +65,26 @@ interface Project {
 
 // Columns that only exist for the legacy card flow — never useful in an export.
 const LEGACY_EXPORT_COLUMNS = ['id', 'project_id', 'field_values', 'participant_id', 'department', 'role'];
+
+// Every column a submission can contribute: its own scalar columns plus each key
+// held inside field_values (form answers are stored there, keyed by question label).
+const collectExportColumns = (subs: any[]) => {
+  const columns: string[] = [];
+  const push = (key: string) => {
+    if (LEGACY_EXPORT_COLUMNS.includes(key) || columns.includes(key)) return;
+    columns.push(key);
+  };
+  subs.forEach((sub) => {
+    Object.keys(sub).forEach(push);
+    if (sub.field_values && typeof sub.field_values === 'object') {
+      Object.keys(sub.field_values).forEach(push);
+    }
+  });
+  return columns;
+};
+
+const exportColumnLabel = (key: string) =>
+  key === 'created_at' ? 'Submitted at' : key.replace(/_/g, ' ');
 
 interface SubmissionSummary {
   id: string;
@@ -74,6 +103,10 @@ export default function ProjectDetails() {
   const [loading, setLoading] = useState(true);
   const [formLink, setFormLink] = useState('');
   const [friendlyLink, setFriendlyLink] = useState('');
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportColumns, setExportColumns] = useState<string[]>([]);
+  const [selectedExportColumns, setSelectedExportColumns] = useState<string[]>([]);
+  const [loadingExportColumns, setLoadingExportColumns] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -158,7 +191,42 @@ export default function ProjectDetails() {
     link.click();
   };
 
-  const exportToCSV = async () => {
+  const openExportDialog = async () => {
+    if (!project) return;
+    setExportOpen(true);
+    setLoadingExportColumns(true);
+    try {
+      const { data, error } = await supabase
+        .from('submissions')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        toast.warning('No submissions to export');
+        setExportOpen(false);
+        return;
+      }
+
+      const cols = collectExportColumns(data);
+      setExportColumns(cols);
+      setSelectedExportColumns(cols);
+    } catch (error) {
+      toast.error('Could not load export columns');
+      setExportOpen(false);
+    } finally {
+      setLoadingExportColumns(false);
+    }
+  };
+
+  const toggleExportColumn = (column: string) => {
+    setSelectedExportColumns(prev =>
+      prev.includes(column) ? prev.filter(c => c !== column) : [...prev, column]
+    );
+  };
+
+  const exportToCSV = async (columns?: string[]) => {
     if (!project) return;
     try {
       const { data: fullSubmissions, error: submissionsError } = await supabase
@@ -173,33 +241,15 @@ export default function ProjectDetails() {
         return;
       }
 
-      const headers = Object.keys(fullSubmissions[0]).filter(key =>
-        !LEGACY_EXPORT_COLUMNS.includes(key)
-      );
-      
-      let allHeaders = [...headers];
-      fullSubmissions.forEach(sub => {
-        if (sub.field_values && typeof sub.field_values === 'object') {
-          Object.keys(sub.field_values).forEach(fieldKey => {
-            if (!allHeaders.includes(fieldKey)) allHeaders.push(fieldKey);
-          });
-        }
-      });
-      
+      const allHeaders = columns?.length ? columns : collectExportColumns(fullSubmissions);
+
       const csvRows = [];
       csvRows.push(allHeaders.join(','));
       fullSubmissions.forEach(sub => {
         const row = allHeaders.map(header => {
-          if (header === 'field_values') {
-            return JSON.stringify(sub[header] || {});
-          } else if (header in sub) {
-            const value = sub[header];
-            return `"${String(value).replace(/"/g, '""')}"`;
-          } else if (sub.field_values && typeof sub.field_values === 'object' && header in sub.field_values) {
-            const value = sub.field_values[header];
-            return `"${String(value).replace(/"/g, '""')}"`;
-          }
-          return '""';
+          const value = header === 'field_values' ? null : sub[header] ?? sub.field_values?.[header];
+          if (value === undefined || value === null) return '""';
+          return `"${String(value).replace(/"/g, '""')}"`;
         });
         csvRows.push(row.join(','));
       });
@@ -218,7 +268,7 @@ export default function ProjectDetails() {
     }
   };
 
-  const exportToPDF = async () => {
+  const exportToPDF = async (columns?: string[]) => {
     if (!project) return;
     try {
       const jsPDFModule = await import('jspdf');
@@ -242,16 +292,12 @@ export default function ProjectDetails() {
       table.style.width = '100%';
       table.style.borderCollapse = 'collapse';
       
-      const headers = Object.keys(fullSubmissions[0]).filter(key => !LEGACY_EXPORT_COLUMNS.includes(key));
-      let allHeaders = [...headers];
-      fullSubmissions.forEach(sub => {
-        if (sub.field_values) Object.keys(sub.field_values).forEach(k => { if(!allHeaders.includes(k)) allHeaders.push(k) });
-      });
+      const allHeaders = columns?.length ? columns : collectExportColumns(fullSubmissions);
 
       const headerRow = document.createElement('tr');
       allHeaders.forEach(h => {
         const th = document.createElement('th');
-        th.textContent = h;
+        th.textContent = exportColumnLabel(h);
         th.style.border = '1px solid black';
         th.style.padding = '8px';
         th.style.backgroundColor = '#f2f2f2';
@@ -263,7 +309,8 @@ export default function ProjectDetails() {
         const row = document.createElement('tr');
         allHeaders.forEach(h => {
           const td = document.createElement('td');
-          td.textContent = sub[h] || (sub.field_values?.[h]) || '';
+          const value = h === 'field_values' ? null : sub[h] ?? sub.field_values?.[h];
+          td.textContent = value === undefined || value === null ? '' : String(value);
           td.style.border = '1px solid black';
           td.style.padding = '8px';
           row.appendChild(td);
@@ -382,14 +429,99 @@ export default function ProjectDetails() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={exportToCSV}>
-              <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" /> CSV
-            </Button>
-            <Button variant="outline" size="sm" onClick={exportToPDF}>
-              <FileText className="mr-1.5 h-3.5 w-3.5" /> PDF
+            <Button variant="accent" size="sm" onClick={openExportDialog}>
+              <Download className="mr-1.5 h-3.5 w-3.5" /> Export
             </Button>
           </div>
         </div>
+
+        <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="font-display text-xl tracking-tight">
+                Choose columns to export
+              </DialogTitle>
+              <DialogDescription className="text-sm text-foreground/50">
+                Pick what goes into your file. {selectedExportColumns.length} of {exportColumns.length}{' '}
+                columns selected.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex items-center justify-between gap-4">
+              <span className="mono-label text-[9px] text-foreground/40">Columns</span>
+              <div className="flex gap-3 text-xs text-foreground/60">
+                <button
+                  type="button"
+                  className="underline-offset-4 hover:text-foreground hover:underline"
+                  onClick={() => setSelectedExportColumns(exportColumns)}
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  className="underline-offset-4 hover:text-foreground hover:underline"
+                  onClick={() => setSelectedExportColumns([])}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <div className="max-h-[320px] space-y-0.5 overflow-y-auto rounded-xl border border-foreground/10 bg-white/60 p-2">
+              {loadingExportColumns ? (
+                <div className="flex items-center justify-center py-10">
+                  <Loader2 className="h-5 w-5 animate-spin text-foreground/40" />
+                </div>
+              ) : exportColumns.length === 0 ? (
+                <p className="py-6 text-center text-sm text-foreground/45">
+                  No columns to show for this project yet.
+                </p>
+              ) : (
+                exportColumns.map(column => (
+                  <label
+                    key={column}
+                    className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-sm transition hover:bg-secondary/60"
+                  >
+                    <Checkbox
+                      checked={selectedExportColumns.includes(column)}
+                      onCheckedChange={() => toggleExportColumn(column)}
+                    />
+                    <span className="min-w-0 flex-1 truncate">{exportColumnLabel(column)}</span>
+                  </label>
+                ))
+              )}
+            </div>
+
+            <DialogFooter className="gap-2 sm:justify-between">
+              <Button variant="ghost" size="sm" onClick={() => setExportOpen(false)}>
+                Cancel
+              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={selectedExportColumns.length === 0}
+                  onClick={() => {
+                    setExportOpen(false);
+                    exportToCSV(selectedExportColumns);
+                  }}
+                >
+                  <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" /> CSV
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={selectedExportColumns.length === 0}
+                  onClick={() => {
+                    setExportOpen(false);
+                    exportToPDF(selectedExportColumns);
+                  }}
+                >
+                  <FileText className="mr-1.5 h-3.5 w-3.5" /> PDF
+                </Button>
+              </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Share link */}
         <div className="grid gap-5 lg:grid-cols-[1.6fr_1fr]">
