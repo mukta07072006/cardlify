@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,6 +7,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Eyebrow, Wordmark } from '@/components/studio';
+import { RichText } from '@/components/RichText';
+import { useUserRole } from '@/hooks/useUserRole';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import {
   createEmptyField,
@@ -20,12 +30,15 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
+  Bold,
   Eye,
   ImagePlus,
   LayoutTemplate,
   Loader2,
+  Lock,
   Plus,
   Save,
+  Sparkles,
   Trash2,
 } from 'lucide-react';
 
@@ -89,8 +102,9 @@ const buildSignature = (
 export default function FormBuilder() {
   const { projectId } = useParams<{ projectId: string }>();
   const { user, loading: authLoading } = useAuth();
+  const { isElite } = useUserRole();
   const navigate = useNavigate();
-
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const [project, setProject] = useState<FormProject | null>(null);
   const [formTitle, setFormTitle] = useState('');
   const [formDescription, setFormDescription] = useState('');
@@ -104,6 +118,26 @@ export default function FormBuilder() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedSignature, setSavedSignature] = useState('');
+  const [eliteDialogOpen, setEliteDialogOpen] = useState(false);
+
+  /** Wraps the selected intro text in ** so it renders bold on the submit page. */
+  const toggleDescriptionBold = () => {
+    const el = descriptionRef.current;
+    if (!el) return;
+
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = formDescription.slice(start, end);
+    const next =
+      formDescription.slice(0, start) + `**${selected}**` + formDescription.slice(end);
+    setFormDescription(next);
+
+    requestAnimationFrame(() => {
+      el.focus();
+      const cursor = selected ? start + selected.length + 4 : start + 2;
+      el.setSelectionRange(cursor, cursor);
+    });
+  };
 
   const signature = useMemo(
     () => buildSignature(
@@ -404,8 +438,12 @@ export default function FormBuilder() {
           form_title: formTitle.trim() || project.project_name,
           form_description: formDescription.trim() || null,
           form_header_image_url: formHeaderImageUrl,
-          email_notifications_enabled: emailNotifications,
-          email_sender_name: emailSenderName.trim() || project.project_name,
+          email_notifications_enabled: isElite
+            ? emailNotifications
+            : Boolean(project.email_notifications_enabled),
+          email_sender_name: isElite
+            ? emailSenderName.trim() || project.project_name
+            : project.email_sender_name,
           photo_required: photoRequired,
         })
         .eq('id', project.id);
@@ -554,17 +592,48 @@ export default function FormBuilder() {
             />
           </div>
           <div className="mt-6 space-y-2">
-            <Label htmlFor="formDescription" className="mono-label text-foreground/45">
-              Intro text
-            </Label>
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="formDescription" className="mono-label text-foreground/45">
+                Intro text
+              </Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={toggleDescriptionBold}
+                className="h-8 rounded-full px-3 text-xs"
+                title="Bold — select some text first (Ctrl/Cmd+B)"
+              >
+                <Bold className="mr-1.5 h-3.5 w-3.5" />
+                Bold
+              </Button>
+            </div>
             <textarea
               id="formDescription"
+              ref={descriptionRef}
               value={formDescription}
               onChange={(e) => setFormDescription(e.target.value)}
-              rows={3}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
+                  e.preventDefault();
+                  toggleDescriptionBold();
+                }
+              }}
+              rows={4}
               placeholder="Tell people why you are collecting this."
               className="w-full rounded-xl border border-foreground/15 bg-white/70 px-4 py-3 text-sm outline-none transition focus:border-foreground/35"
             />
+            <p className="text-[11px] leading-relaxed text-foreground/40">
+              Line breaks are kept. Select text and press Bold (or Ctrl/Cmd+B) to emphasise it.
+            </p>
+            {formDescription.trim() && (
+              <div className="rounded-xl border border-foreground/10 bg-background/40 px-4 py-3">
+                <p className="mono-label text-[9px] text-foreground/35">Preview</p>
+                <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-foreground">
+                  <RichText text={formDescription} />
+                </p>
+              </div>
+            )}
           </div>
           <div className="mt-6 space-y-2">
             <Label className="mono-label text-foreground/45">Header image</Label>
@@ -635,23 +704,53 @@ export default function FormBuilder() {
           <div className="mt-7 border-t border-foreground/10 pt-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <Label htmlFor="emailNotifications" className="mono-label text-foreground/45">
+                <Label
+                  htmlFor="emailNotifications"
+                  className="mono-label flex flex-wrap items-center gap-2 text-foreground/45"
+                >
                   Confirmation email
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] ${
+                      isElite ? 'bg-lime/60 text-foreground/60' : 'bg-foreground/10 text-foreground/45'
+                    }`}
+                  >
+                    {isElite ? <Sparkles className="h-2.5 w-2.5" /> : <Lock className="h-2.5 w-2.5" />}
+                    {isElite ? 'Elite' : 'Locked'}
+                  </span>
                 </Label>
                 <p className="mt-2 max-w-sm text-xs leading-relaxed text-foreground/50">
                   Everyone who submits gets a branded email with their serial code, based on the
                   form title.
                 </p>
+                {!isElite && (
+                  <p className="mt-2 max-w-sm text-xs leading-relaxed text-foreground/40">
+                    Confirmation emails are an Elite feature. Upgrade to switch them on for this
+                    form.
+                  </p>
+                )}
               </div>
-              <Switch
-                id="emailNotifications"
-                checked={emailNotifications}
-                onCheckedChange={setEmailNotifications}
-                className="mt-1"
-              />
+              {isElite ? (
+                <Switch
+                  id="emailNotifications"
+                  checked={emailNotifications}
+                  onCheckedChange={setEmailNotifications}
+                  className="mt-1"
+                />
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-1 shrink-0 rounded-full"
+                  onClick={() => setEliteDialogOpen(true)}
+                >
+                  <Lock className="mr-1.5 h-3.5 w-3.5" />
+                  Locked
+                </Button>
+              )}
             </div>
 
-            {emailNotifications && (
+            {isElite && emailNotifications && (
               <div className="mt-5 space-y-2 rounded-2xl border border-foreground/10 bg-background/40 p-4">
                 <Label htmlFor="emailSenderName" className="mono-label text-foreground/45">
                   Sender name
@@ -813,6 +912,42 @@ export default function FormBuilder() {
           </Button>
         </div>
       </main>
+
+      <Dialog open={eliteDialogOpen} onOpenChange={setEliteDialogOpen}>
+        <DialogContent className="max-w-md rounded-3xl border-foreground/10">
+          <DialogHeader>
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-lilac/70">
+              <Lock className="h-5 w-5 text-foreground/60" />
+            </div>
+            <DialogTitle className="display-md mt-3 text-center">
+              Confirmation emails are Elite
+            </DialogTitle>
+            <DialogDescription className="text-center text-sm leading-relaxed text-foreground/55">
+              Go Elite to send every submitter a branded email with their serial code, using your
+              own sender name and no Cardlify watermark.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-2 flex-col gap-2 sm:flex-col">
+            <Button
+              className="w-full rounded-full"
+              onClick={() => {
+                setEliteDialogOpen(false);
+                navigate('/pricing');
+              }}
+            >
+              <Sparkles className="mr-1.5 h-4 w-4" />
+              Become Elite
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full rounded-full"
+              onClick={() => setEliteDialogOpen(false)}
+            >
+              Not now
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

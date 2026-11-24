@@ -161,7 +161,7 @@ const FieldOverlay = memo(({
   onMouseDown,
   onTouchStart,
   onClick,
-  scale = 1,
+  previewFontSize = 12,
   canEditTemplate
 }: { 
   field: Field;
@@ -169,7 +169,8 @@ const FieldOverlay = memo(({
   onMouseDown: (e: React.MouseEvent, fieldId: string, isResize?: boolean) => void;
   onTouchStart: (e: React.TouchEvent, fieldId: string, isResize?: boolean) => void;
   onClick: (e: React.MouseEvent | React.TouchEvent) => void;
-  scale: number;
+  /** Font size in canvas pixels, matched to how the card is rendered on submit. */
+  previewFontSize?: number;
   canEditTemplate: boolean;
 }) => {
   const shapeClass = field.shape === 'circle' 
@@ -201,11 +202,15 @@ const FieldOverlay = memo(({
           : isSelected 
             ? '2px solid #3b82f6' 
             : '2px dashed rgba(156, 163, 175, 0.5)',
-        backgroundColor: field.field_type === 'text' && field.background_opacity > 0
-          ? `${field.background_color}${Math.round(field.background_opacity * 255).toString(16).padStart(2, '0')}`
-          : isSelected 
-            ? 'rgba(59, 130, 246, 0.1)' 
-            : 'rgba(255, 255, 255, 0.3)',
+        backgroundColor: field.field_type === 'text'
+          ? field.background_opacity > 0
+            ? `${field.background_color}${Math.round(field.background_opacity * 255).toString(16).padStart(2, '0')}`
+            : isSelected
+              ? 'rgba(59, 130, 246, 0.08)'
+              : 'transparent'
+          : isSelected
+            ? 'rgba(59, 130, 246, 0.1)'
+            : 'rgba(255, 255, 255, 0.25)',
         zIndex: field.z_index,
         touchAction: 'none',
         ...shadowStyle
@@ -214,28 +219,29 @@ const FieldOverlay = memo(({
       onTouchStart={(e) => canEditTemplate && onTouchStart(e, field.id)}
       onClick={(e) => canEditTemplate && onClick(e)}
     >
-      <div className="absolute inset-0 overflow-hidden flex items-center px-1">
+      <div className="absolute inset-0 flex items-center overflow-hidden px-1">
         {field.field_type === 'photo' ? (
           <div className="w-full h-full flex items-center justify-center">
             <Image className="w-4 h-4 text-gray-400" />
           </div>
         ) : (
-          <div className="w-full min-w-0" style={{ textAlign: field.text_align || 'left' }}>
-            <span 
-              className="inline-flex max-w-full items-center gap-1 rounded bg-white/90 px-2 py-1 text-xs font-medium overflow-hidden"
-              style={{
-                fontFamily: field.font_family,
-                fontSize: `${Math.min(field.font_size * scale * 0.5, 12)}px`,
-                fontWeight: field.font_weight,
-                fontStyle: field.font_italic ? 'italic' : 'normal',
-                color: field.font_color,
-                letterSpacing: `${field.letter_spacing}px`,
-                lineHeight: field.line_height
-              }}
-            >
-              <Type className="w-3 h-3 flex-shrink-0" />
-              <span className="min-w-0 truncate">{field.field_name}</span>
-            </span>
+          <div
+            className="w-full min-w-0"
+            style={{
+              textAlign: field.text_align || 'left',
+              fontFamily: `"${field.font_family}", sans-serif`,
+              fontSize: `${Math.max(6, previewFontSize)}px`,
+              fontWeight: field.font_weight || 400,
+              fontStyle: field.font_italic ? 'italic' : 'normal',
+              color: field.font_color,
+              letterSpacing: `${field.letter_spacing}px`,
+              lineHeight: field.line_height,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}
+          >
+            {field.field_name || 'Text'}
           </div>
         )}
       </div>
@@ -287,6 +293,20 @@ export default function TemplateEditor() {
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  // Kept in the editor itself so switching a property never throws the panel back to Basic.
+  const [propertiesTab, setPropertiesTab] = useState<'basic' | 'style' | 'advanced'>('basic');
+  const [canvasDisplayHeight, setCanvasDisplayHeight] = useState(0);
+
+  // Track the rendered canvas height so text previews match the generated card.
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const update = () => setCanvasDisplayHeight(el.clientHeight);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loading, project?.template_image_url]);
 
   // Undo/Redo history
   const [history, setHistory] = useState<HistoryState[]>([]);
@@ -941,7 +961,11 @@ export default function TemplateEditor() {
 
     return (
       <div className="space-y-4 pb-6">
-        <Tabs defaultValue="basic" className="w-full">
+        <Tabs
+          value={propertiesTab}
+          onValueChange={(value) => setPropertiesTab(value as 'basic' | 'style' | 'advanced')}
+          className="w-full"
+        >
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="basic" className="text-xs md:text-sm">
               <Layout className="w-3 h-3 md:w-4 md:h-4 mr-1" />
@@ -1858,7 +1882,11 @@ export default function TemplateEditor() {
                           setIsPropertiesOpen(true);
                         }
                       }}
-                      scale={zoom}
+                      previewFontSize={
+                        canvasDisplayHeight
+                          ? (field.font_size * canvasDisplayHeight) / 600
+                          : Math.min(field.font_size * 0.6, 14)
+                      }
                       canEditTemplate={canEditTemplate}
                     />
                   ))}

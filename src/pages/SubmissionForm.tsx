@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Wordmark } from '@/components/studio';
 import { ImageCropper, type CropResult } from '@/components/ImageCropper';
+import { RichText } from '@/components/RichText';
 import { toast } from 'sonner';
 import { extractProjectId } from '@/lib/urlUtils';
 import { createSerialCode, EMAIL_PATTERN } from '@/lib/email';
@@ -863,11 +864,13 @@ export default function SubmissionForm() {
 
       if (notificationsEnabled && serialCode && recipientEmail) {
         try {
-          const { error: mailError } = await supabase.functions.invoke(
+          const { data: mailData, error: mailError } = await supabase.functions.invoke(
             'send-submission-email',
             { body: { submissionId } },
           );
           if (mailError) throw mailError;
+          // The function reports a skip (e.g. the organiser is not on Elite).
+          if (!mailData?.sent) throw new Error('Confirmation email was not sent');
           setSubmittedSerialCode(serialCode);
           setSubmittedEmail(recipientEmail);
         } catch (mailError) {
@@ -1094,11 +1097,14 @@ export default function SubmissionForm() {
             </span>
 
             <h1 className="display-lg mt-6">{displayTitle}</h1>
-            <p className="mt-5 max-w-md whitespace-pre-line text-sm leading-relaxed text-foreground/60">
-              {project.form_description ||
-                (needsCard
-                  ? 'Add your details below and your personalised card is generated instantly. No account, no waiting.'
-                  : 'Answer a few questions below. Your organiser sees the responses right away.')}
+            <p className="mt-5 max-w-md whitespace-pre-line text-sm leading-relaxed text-foreground">
+              {project.form_description ? (
+                <RichText text={project.form_description} />
+              ) : needsCard ? (
+                'Add your details below and your personalised card is generated instantly. No account, no waiting.'
+              ) : (
+                'Answer a few questions below. Your organiser sees the responses right away.'
+              )}
             </p>
 
             <div className="mt-7 flex flex-wrap gap-2">

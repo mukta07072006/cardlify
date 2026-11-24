@@ -212,6 +212,15 @@ Deno.serve(async (request) => {
   }
   if (!project || !project.email_notifications_enabled) return json({ skipped: 'not-enabled' });
 
+  // Confirmation emails are an Elite feature — enforce it here, not just in the UI.
+  const { data: ownerProfile } = await supabase
+    .from('profiles')
+    .select('subscription_tier')
+    .eq('user_id', project.user_id)
+    .maybeSingle();
+
+  if (ownerProfile?.subscription_tier !== 'elite') return json({ skipped: 'not-elite' });
+
   const recipient = findRecipient(submission.field_values);
   if (!recipient) return json({ skipped: 'no-recipient' });
 

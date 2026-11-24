@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Eyebrow, Wordmark } from '@/components/studio';
 import { toast } from 'sonner';
 import { generateProjectSlug } from '@/lib/urlUtils';
+import { useUserRole } from '@/hooks/useUserRole';
 import { 
   ArrowLeft, 
   Edit, 
@@ -21,7 +22,10 @@ import {
   RefreshCw,
   FileSpreadsheet,
   FileText,
-  ClipboardList
+  ClipboardList,
+  Lock,
+  Mail,
+  Sparkles
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -61,6 +65,8 @@ interface Project {
   project_mode: string | null;
   form_title: string | null;
   form_description: string | null;
+  email_notifications_enabled: boolean | null;
+  email_sender_name: string | null;
 }
 
 // Columns that only exist for the legacy card flow — never useful in an export.
@@ -96,6 +102,7 @@ interface SubmissionSummary {
 export default function ProjectDetails() {
   const { projectId } = useParams<{ projectId: string }>();
   const { user } = useAuth();
+  const { isElite } = useUserRole();
   const navigate = useNavigate();
   
   const [project, setProject] = useState<Project | null>(null);
@@ -587,6 +594,56 @@ export default function ProjectDetails() {
             </div>
           </div>
         </div>
+
+        {(project?.project_mode === 'form' || project?.project_mode === 'both') && (
+          <div className="flex flex-col justify-between gap-4 rounded-[1.75rem] border border-foreground/10 bg-white/60 px-6 py-5 sm:flex-row sm:items-center">
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-secondary">
+                <Mail className="h-4 w-4 text-foreground/50" />
+              </span>
+              <div>
+                <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                  Confirmation email
+                  <span
+                    className={`mono-label inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] ${
+                      isElite ? 'bg-lime/60 text-foreground/60' : 'bg-foreground/10 text-foreground/45'
+                    }`}
+                  >
+                    {isElite ? <Sparkles className="h-2.5 w-2.5" /> : <Lock className="h-2.5 w-2.5" />}
+                    {isElite ? (project?.email_notifications_enabled ? 'On' : 'Off') : 'Elite only'}
+                  </span>
+                </p>
+                <p className="mt-1 max-w-xl text-xs leading-relaxed text-foreground/45">
+                  {isElite
+                    ? project?.email_notifications_enabled
+                      ? `Submitters receive a branded email from “${
+                          project?.email_sender_name || project?.project_name
+                        }” with their serial code.`
+                      : 'Turn it on in the form settings to email every submitter their serial code.'
+                    : 'Submitters can receive a branded email with their serial code. This is an Elite feature.'}
+                </p>
+              </div>
+            </div>
+            {isElite ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 rounded-full"
+                onClick={() => navigate(`/project/${projectId}/forms`)}
+              >
+                Email settings
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                className="shrink-0 rounded-full"
+                onClick={() => navigate('/pricing')}
+              >
+                <Lock className="mr-1.5 h-3.5 w-3.5" /> Unlock with Elite
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* Submissions */}
         <div className="overflow-hidden rounded-[1.75rem] border border-foreground/10 bg-white/60">
