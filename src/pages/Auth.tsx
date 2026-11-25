@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,10 +25,16 @@ export default function Auth() {
 
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedNext = searchParams.get('next');
+  const destination =
+    requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
+      ? requestedNext
+      : '/dashboard';
 
   useEffect(() => {
-    if (user) navigate('/dashboard');
-  }, [user, navigate]);
+    if (user) navigate(destination);
+  }, [user, navigate, destination]);
 
   const validateForm = () => {
     try {
@@ -65,7 +71,7 @@ export default function Auth() {
           toast.error(error.message);
         } else {
           toast.success('Welcome back');
-          navigate('/dashboard');
+          navigate(destination);
         }
       } else {
         const { error } = await signUp(email, password, name);

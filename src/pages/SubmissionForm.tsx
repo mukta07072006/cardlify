@@ -11,6 +11,14 @@ import { toast } from 'sonner';
 import { extractProjectId } from '@/lib/urlUtils';
 import { createSerialCode, EMAIL_PATTERN } from '@/lib/email';
 import {
+  closedReasonMessage,
+  closedReasonOf,
+  formatCloseMoment,
+  parseAvailability,
+  spotsLeft,
+  type ProjectAvailability,
+} from '@/lib/formWindow';
+import {
   ArrowRight,
   Camera,
   Loader2,
@@ -106,6 +114,8 @@ interface Project {
   email_notifications_enabled?: boolean | null;
   email_sender_name?: string | null;
   photo_required?: boolean | null;
+  auto_close_at?: string | null;
+  max_submissions?: number | null;
 }
 
 export default function SubmissionForm() {
@@ -134,6 +144,7 @@ export default function SubmissionForm() {
   const [submittedSerialCode, setSubmittedSerialCode] = useState<string | null>(null);
   const [submittedEmail, setSubmittedEmail] = useState('');
   const [emailFailed, setEmailFailed] = useState(false);
+  const [availability, setAvailability] = useState<ProjectAvailability | null>(null);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -300,6 +311,20 @@ export default function SubmissionForm() {
         }
 
         setProject(projectData);
+
+        // The form may be closed by date or by response limit, not just by status.
+        const { data: availabilityData } = await supabase.rpc('get_project_availability', {
+          _project_id: actualProjectId,
+        });
+        setAvailability(
+          parseAvailability(availabilityData) ?? {
+            status: projectData.status ?? null,
+            auto_close_at: null,
+            max_submissions: null,
+            submission_count: 0,
+            closed: false,
+          },
+        );
 
         const mode = ((projectData as { project_mode?: ProjectMode }).project_mode ?? 'card') as ProjectMode;
         setProjectMode(mode);
@@ -860,7 +885,20 @@ export default function SubmissionForm() {
           serial_code: serialCode,
         });
 
-      if (submissionError) throw submissionError;
+      if (submissionError) {
+        const message = `${submissionError.message} ${submissionError.details ?? ''}`;
+        if (message.includes('form_full')) {
+          toast.error('This form just reached its response limit.');
+          setAvailability((current) => (current ? { ...current, closed: true } : current));
+          return;
+        }
+        if (message.includes('form_closed')) {
+          toast.error('This form has closed.');
+          setAvailability((current) => (current ? { ...current, closed: true } : current));
+          return;
+        }
+        throw submissionError;
+      }
 
       if (notificationsEnabled && serialCode && recipientEmail) {
         try {
@@ -911,6 +949,7 @@ export default function SubmissionForm() {
   const headerImageUrl = project?.form_header_image_url?.trim() || null;
 
   const notificationsEnabled = Boolean(project?.email_notifications_enabled);
+  const closedReason = closedReasonOf(availability);
   const hasEmailQuestion =
     formQuestions.some((question) => question.field_type === 'email') ||
     (needsCard &&
@@ -942,8 +981,8 @@ export default function SubmissionForm() {
           <Wordmark />
         </Link>
         <span className="mono-label flex items-center gap-2 text-[9px] text-foreground/40">
-          <span className="h-1.5 w-1.5 rounded-full bg-lime" />
-          {project?.status === 'active' ? 'Accepting responses' : 'Closed'}
+          <span className={`h-1.5 w-1.5 rounded-full ${closedReason ? 'bg-foreground/25' : 'bg-lime'}`} />
+          {closedReason ? 'Closed' : 'Accepting responses'}
         </span>
       </div>
     </div>
@@ -977,6 +1016,30 @@ export default function SubmissionForm() {
           >
             Cardlify studio
           </a>
+        </div>
+      </div>
+    );
+  }
+
+  if (closedReason) {
+    return (
+      <div className="min-h-screen bg-background">
+        {topBar}
+
+        <div className="mx-auto flex max-w-xl flex-col items-center px-5 py-16 text-center sm:px-8 sm:py-24">
+          <div className="grid h-16 w-16 place-items-center rounded-2xl bg-secondary">
+            <Lock className="h-7 w-7 text-foreground/40" />
+          </div>
+          <h2 className="display-lg mt-6">This form is closed</h2>
+          <p className="mt-4 max-w-md text-sm leading-relaxed text-foreground/55">
+            {closedReasonMessage(closedReason)} Ask the organiser if they plan to reopen it.
+          </p>
+          {availability?.auto_close_at && (
+            <p className="mono-label mt-6 text-[9px] text-foreground/35">
+              Deadline was {formatCloseMoment(availability.auto_close_at)}
+            </p>
+          )}
+          <p className="mono-label mt-6 text-[9px] text-foreground/35">{displayTitle}</p>
         </div>
       </div>
     );
@@ -1117,6 +1180,16 @@ export default function SubmissionForm() {
               <span className="mono-label rounded-full bg-lime/60 px-3 py-1.5 text-[9px] text-foreground/60">
                 No account needed
               </span>
+              {spotsLeft(availability) !== null && (
+                <span className="mono-label rounded-full bg-secondary px-3 py-1.5 text-[9px] text-foreground/55">
+                  {spotsLeft(availability)} spots left
+                </span>
+              )}
+              {availability?.auto_close_at && (
+                <span className="mono-label rounded-full bg-secondary px-3 py-1.5 text-[9px] text-foreground/55">
+                  Closes {formatCloseMoment(availability.auto_close_at)}
+                </span>
+              )}
             </div>
 
             {!isFullyLoaded && (

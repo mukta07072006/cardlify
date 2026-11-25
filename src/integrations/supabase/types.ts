@@ -195,8 +195,44 @@ export type Database = {
         }
         Relationships: []
       }
+      project_viewers: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          invited_by: string | null
+          invited_by_name: string | null
+          project_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          invited_by?: string | null
+          invited_by_name?: string | null
+          project_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          invited_by?: string | null
+          invited_by_name?: string | null
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_viewers_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
+          auto_close_at: string | null
           created_at: string
           email_notifications_enabled: boolean
           email_sender_name: string | null
@@ -204,6 +240,7 @@ export type Database = {
           form_header_image_url: string | null
           form_title: string | null
           id: string
+          max_submissions: number | null
           photo_required: boolean
           project_mode: string
           project_name: string
@@ -212,11 +249,13 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          auto_close_at?: string | null
           created_at?: string
           form_description?: string | null
           form_header_image_url?: string | null
           form_title?: string | null
           id?: string
+          max_submissions?: number | null
           project_mode?: string
           project_name: string
           status?: string
@@ -224,6 +263,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          auto_close_at?: string | null
           created_at?: string
           email_notifications_enabled?: boolean
           email_sender_name?: string | null
@@ -231,6 +271,7 @@ export type Database = {
           form_header_image_url?: string | null
           form_title?: string | null
           id?: string
+          max_submissions?: number | null
           photo_required?: boolean
           project_mode?: string
           project_name?: string
@@ -349,9 +390,21 @@ export type Database = {
       }
     }
     Functions: {
+      get_project_availability: {
+        Args: { _project_id: string }
+        Returns: Json
+      }
       get_subscription_tier: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["subscription_tier"]
+      }
+      is_project_viewer: {
+        Args: { _project_id: string }
+        Returns: boolean
+      }
+      project_submission_count: {
+        Args: { _project_id: string }
+        Returns: number
       }
       has_role: {
         Args: {

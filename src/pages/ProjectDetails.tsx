@@ -8,6 +8,7 @@ import { Eyebrow, Wordmark } from '@/components/studio';
 import { toast } from 'sonner';
 import { generateProjectSlug } from '@/lib/urlUtils';
 import { useUserRole } from '@/hooks/useUserRole';
+import { formatCloseMoment } from '@/lib/formWindow';
 import { 
   ArrowLeft, 
   Edit, 
@@ -25,7 +26,13 @@ import {
   ClipboardList,
   Lock,
   Mail,
-  Sparkles
+  ShieldCheck,
+  Sparkles,
+  UserPlus,
+  CalendarClock,
+  Copy,
+  Gauge,
+  X
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -67,6 +74,15 @@ interface Project {
   form_description: string | null;
   email_notifications_enabled: boolean | null;
   email_sender_name: string | null;
+  auto_close_at: string | null;
+  max_submissions: number | null;
+}
+
+interface ProjectViewerRow {
+  id: string;
+  email: string;
+  invited_by_name: string | null;
+  created_at: string;
 }
 
 // Columns that only exist for the legacy card flow — never useful in an export.
@@ -114,6 +130,10 @@ export default function ProjectDetails() {
   const [exportColumns, setExportColumns] = useState<string[]>([]);
   const [selectedExportColumns, setSelectedExportColumns] = useState<string[]>([]);
   const [loadingExportColumns, setLoadingExportColumns] = useState(false);
+  const [viewers, setViewers] = useState<ProjectViewerRow[]>([]);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [removingViewerId, setRemovingViewerId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -149,12 +169,90 @@ export default function ProjectDetails() {
 
       if (submissionsError) throw submissionsError;
       setSubmissions(submissionsData || []);
+
+      const { data: viewerRows, error: viewerError } = await supabase
+        .from('project_viewers')
+        .select('id, email, invited_by_name, created_at')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: true });
+
+      if (viewerError) throw viewerError;
+      setViewers((viewerRows as ProjectViewerRow[]) || []);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load project');
       navigate('/dashboard');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const readerLink = `${window.location.origin}/project/${projectId}/viewer`;
+
+  const copyReaderLink = () => {
+    navigator.clipboard.writeText(readerLink);
+    toast.success('Viewer link copied');
+  };
+
+  const inviteViewer = async () => {
+    const email = inviteEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      toast.error('Enter a valid email address');
+      return;
+    }
+
+    setInviting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('invite-project-viewer', {
+        body: { projectId, email },
+      });
+
+      if (error) {
+        const context = (error as { context?: Response }).context;
+        let message = error.message;
+        if (context && typeof context.json === 'function') {
+          try {
+            const body = await context.json();
+            if (body?.error) message = String(body.error);
+          } catch {
+            // Keep the transport message when the body is not JSON.
+          }
+        }
+        throw new Error(message);
+      }
+
+      setInviteEmail('');
+      await fetchData();
+
+      if (data?.emailed) {
+        toast.success(`Invite sent to ${email}`);
+      } else {
+        toast.warning(
+          data?.error
+            ? `${data.error} — share the viewer link instead.`
+            : 'Invite saved — share the viewer link instead.',
+        );
+      }
+    } catch (error) {
+      console.error('Could not invite that person:', error);
+      toast.error(error instanceof Error ? error.message : 'Could not send the invite');
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const removeViewer = async (id: string) => {
+    setRemovingViewerId(id);
+    try {
+      const { error } = await supabase.from('project_viewers').delete().eq('id', id);
+      if (error) throw error;
+      setViewers((current) => current.filter((viewer) => viewer.id !== id));
+      toast.success('Access removed');
+    } catch (error) {
+      console.error('Could not remove that access:', error);
+      toast.error('Could not remove that access');
+    } finally {
+      setRemovingViewerId(null);
     }
   };
 
@@ -341,6 +439,14 @@ export default function ProjectDetails() {
       toast.error('PDF Export failed');
     }
   };
+
+  const projectWindowClosed = project
+    ? !(
+        project.status === 'active' &&
+        (!project.auto_close_at || new Date(project.auto_close_at).getTime() > Date.now()) &&
+        (!project.max_submissions || submissions.length < project.max_submissions)
+      )
+    : false;
 
   if (loading) {
     return (
@@ -585,10 +691,31 @@ export default function ProjectDetails() {
                 </span>
               </div>
             </div>
+            {(project?.auto_close_at || project?.max_submissions) && (
+              <div className="mt-5 space-y-1.5 border-t border-foreground/10 pt-4 text-xs text-foreground/50">
+                {project?.auto_close_at && (
+                  <p className="flex items-center gap-2">
+                    <CalendarClock className="h-3.5 w-3.5" />
+                    Closes {formatCloseMoment(project.auto_close_at)}
+                  </p>
+                )}
+                {project?.max_submissions && (
+                  <p className="flex items-center gap-2">
+                    <Gauge className="h-3.5 w-3.5" />
+                    {submissions.length} of {project.max_submissions} responses
+                  </p>
+                )}
+                {projectWindowClosed && (
+                  <p className="text-foreground/70">
+                    Closed — the form is not accepting responses.
+                  </p>
+                )}
+              </div>
+            )}
             <div className="mt-6 flex items-center justify-between border-t border-foreground/10 pt-5">
               <span className="flex items-center gap-2 text-xs text-foreground/45">
                 <Users className="h-3.5 w-3.5" />
-                Private to your account
+                Owner and invited viewers
               </span>
               <span className="mono-label text-[9px] text-foreground/30">v1.0.4</span>
             </div>
@@ -644,6 +771,80 @@ export default function ProjectDetails() {
             )}
           </div>
         )}
+
+        {/* Read-only access */}
+        <div className="rounded-[1.75rem] border border-foreground/10 bg-white/60 px-6 py-6 sm:px-8">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-secondary">
+                <ShieldCheck className="h-4 w-4 text-foreground/50" />
+              </span>
+              <div>
+                <p className="text-sm font-medium">Read-only access</p>
+                <p className="mt-1 max-w-xl text-xs leading-relaxed text-foreground/45">
+                  Invite someone by email to see these registrations and export them. They cannot
+                  edit the project, the form or any response.
+                </p>
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" className="shrink-0" onClick={copyReaderLink}>
+              <Copy className="mr-1.5 h-3.5 w-3.5" /> Copy viewer link
+            </Button>
+          </div>
+
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+            <Input
+              type="email"
+              value={inviteEmail}
+              onChange={(event) => setInviteEmail(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  inviteViewer();
+                }
+              }}
+              placeholder="teammate@example.com"
+              className="h-11 rounded-xl border-foreground/15 bg-white/70 text-sm"
+            />
+            <Button onClick={inviteViewer} disabled={inviting} className="shrink-0">
+              {inviting ? (
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              ) : (
+                <UserPlus className="mr-1.5 h-4 w-4" />
+              )}
+              Send invite
+            </Button>
+          </div>
+
+          {viewers.length > 0 && (
+            <ul className="mt-4 divide-y divide-foreground/10 rounded-xl border border-foreground/10 bg-background/40">
+              {viewers.map((viewer) => (
+                <li key={viewer.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm">{viewer.email}</p>
+                    <p className="mono-label mt-0.5 text-[9px] text-foreground/35">
+                      Invited {new Date(viewer.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Remove access for ${viewer.email}`}
+                    className="shrink-0 text-foreground/35 hover:bg-destructive/10 hover:text-destructive"
+                    disabled={removingViewerId === viewer.id}
+                    onClick={() => removeViewer(viewer.id)}
+                  >
+                    {removingViewerId === viewer.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <X className="h-4 w-4" />
+                    )}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         {/* Submissions */}
         <div className="overflow-hidden rounded-[1.75rem] border border-foreground/10 bg-white/60">

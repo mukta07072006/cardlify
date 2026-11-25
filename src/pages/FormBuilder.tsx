@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Eyebrow, Wordmark } from '@/components/studio';
 import { RichText } from '@/components/RichText';
+import { fromDateTimeLocal, toDateTimeLocal } from '@/lib/formWindow';
 import { useUserRole } from '@/hooks/useUserRole';
 import {
   Dialog,
@@ -31,6 +32,7 @@ import {
   ArrowLeft,
   ArrowUp,
   Bold,
+  CalendarClock,
   Eye,
   ImagePlus,
   LayoutTemplate,
@@ -52,6 +54,9 @@ interface FormProject {
   email_notifications_enabled: boolean | null;
   email_sender_name: string | null;
   photo_required: boolean | null;
+  status: string;
+  auto_close_at: string | null;
+  max_submissions: number | null;
 }
 
 const fieldClass = 'h-12 rounded-xl border-foreground/15 bg-white/70 text-sm';
@@ -66,6 +71,8 @@ interface FormDraft {
   emailNotifications: boolean;
   emailSenderName: string;
   photoRequired: boolean;
+  autoCloseAt: string;
+  maxSubmissions: string;
   fields: FormField[];
   savedAt: number;
 }
@@ -78,6 +85,8 @@ const buildSignature = (
   emailNotifications: boolean,
   emailSenderName: string,
   photoRequired: boolean,
+  autoCloseAt: string,
+  maxSubmissions: string,
   fields: FormField[],
 ) =>
   JSON.stringify({
@@ -87,6 +96,8 @@ const buildSignature = (
     emailNotifications,
     emailSenderName: emailSenderName.trim(),
     photoRequired,
+    autoCloseAt,
+    maxSubmissions: maxSubmissions.trim(),
     fields: fields.map((field) => [
       field.id,
       field.label.trim(),
@@ -113,6 +124,9 @@ export default function FormBuilder() {
   const [emailNotifications, setEmailNotifications] = useState(false);
   const [emailSenderName, setEmailSenderName] = useState('');
   const [photoRequired, setPhotoRequired] = useState(true);
+  const [autoCloseAt, setAutoCloseAt] = useState('');
+  const [maxSubmissions, setMaxSubmissions] = useState('');
+  const [submissionCount, setSubmissionCount] = useState(0);
   const [fields, setFields] = useState<FormField[]>([]);
   const [originalIds, setOriginalIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -147,6 +161,8 @@ export default function FormBuilder() {
       emailNotifications,
       emailSenderName,
       photoRequired,
+      autoCloseAt,
+      maxSubmissions,
       fields,
     ),
     [
@@ -156,6 +172,8 @@ export default function FormBuilder() {
       emailNotifications,
       emailSenderName,
       photoRequired,
+      autoCloseAt,
+      maxSubmissions,
       fields,
     ],
   );
@@ -175,6 +193,8 @@ export default function FormBuilder() {
       emailNotifications,
       emailSenderName,
       photoRequired,
+      autoCloseAt,
+      maxSubmissions,
       fields: fields.map((field, index) => ({ ...field, position: index })),
       savedAt: Date.now(),
     };
@@ -185,8 +205,10 @@ export default function FormBuilder() {
     }
   }, [
     dirty,
+    autoCloseAt,
     emailNotifications,
     emailSenderName,
+    maxSubmissions,
     photoRequired,
     fields,
     formDescription,
@@ -222,7 +244,7 @@ export default function FormBuilder() {
       const { data, error } = await supabase
         .from('projects')
         .select(
-          'id, project_name, project_mode, form_title, form_description, form_header_image_url, email_notifications_enabled, email_sender_name, photo_required',
+          'id, project_name, project_mode, form_title, form_description, form_header_image_url, email_notifications_enabled, email_sender_name, photo_required, status, auto_close_at, max_submissions',
         )
         .eq('id', projectId)
         .single();
@@ -248,6 +270,8 @@ export default function FormBuilder() {
       const savedEmailNotifications = Boolean(data.email_notifications_enabled);
       const savedEmailSenderName = data.email_sender_name ?? '';
       const savedPhotoRequired = data.photo_required !== false;
+      const savedAutoCloseAt = toDateTimeLocal(data.auto_close_at);
+      const savedMaxSubmissions = data.max_submissions ? String(data.max_submissions) : '';
       const savedIds = new Set(savedFields.map((field) => field.id));
       const savedSignatureValue = buildSignature(
         savedTitle,
@@ -256,6 +280,8 @@ export default function FormBuilder() {
         savedEmailNotifications,
         savedEmailSenderName,
         savedPhotoRequired,
+        savedAutoCloseAt,
+        savedMaxSubmissions,
         savedFields,
       );
 
@@ -265,6 +291,8 @@ export default function FormBuilder() {
       let nextEmailNotifications = savedEmailNotifications;
       let nextEmailSenderName = savedEmailSenderName;
       let nextPhotoRequired = savedPhotoRequired;
+      let nextAutoCloseAt = savedAutoCloseAt;
+      let nextMaxSubmissions = savedMaxSubmissions;
       let nextFields = savedFields;
       let restoredDraft = false;
 
@@ -292,6 +320,10 @@ export default function FormBuilder() {
               draft.emailSenderName === undefined ? savedEmailSenderName : draft.emailSenderName;
             const draftPhotoRequired =
               draft.photoRequired === undefined ? savedPhotoRequired : Boolean(draft.photoRequired);
+            const draftAutoCloseAt =
+              draft.autoCloseAt === undefined ? savedAutoCloseAt : draft.autoCloseAt;
+            const draftMaxSubmissions =
+              draft.maxSubmissions === undefined ? savedMaxSubmissions : draft.maxSubmissions;
 
             if (
               buildSignature(
@@ -301,6 +333,8 @@ export default function FormBuilder() {
                 draftEmailNotifications,
                 draftEmailSenderName,
                 draftPhotoRequired,
+                draftAutoCloseAt,
+                draftMaxSubmissions,
                 draftFields,
               ) !== savedSignatureValue
             ) {
@@ -310,6 +344,8 @@ export default function FormBuilder() {
               nextEmailNotifications = draftEmailNotifications;
               nextEmailSenderName = draftEmailSenderName;
               nextPhotoRequired = draftPhotoRequired;
+              nextAutoCloseAt = draftAutoCloseAt;
+              nextMaxSubmissions = draftMaxSubmissions;
               nextFields = draftFields;
               restoredDraft = true;
             }
@@ -325,9 +361,18 @@ export default function FormBuilder() {
       setEmailNotifications(nextEmailNotifications);
       setEmailSenderName(nextEmailSenderName);
       setPhotoRequired(nextPhotoRequired);
+      setAutoCloseAt(nextAutoCloseAt);
+      setMaxSubmissions(nextMaxSubmissions);
       setFields(nextFields);
       setOriginalIds(savedFields.map((field) => field.id));
       setSavedSignature(savedSignatureValue);
+
+      const { data: availability } = await supabase.rpc('get_project_availability', {
+        _project_id: projectId as string,
+      });
+      if (availability && typeof availability === 'object') {
+        setSubmissionCount(Number((availability as { submission_count?: number }).submission_count ?? 0));
+      }
 
       if (restoredDraft) {
         toast.success('Restored your unsaved draft');
@@ -430,6 +475,12 @@ export default function FormBuilder() {
       }
     }
 
+    const limit = maxSubmissions.trim() ? Number(maxSubmissions) : null;
+    if (limit !== null && (!Number.isInteger(limit) || limit < 1)) {
+      toast.error('The response limit must be a whole number above zero');
+      return;
+    }
+
     setSaving(true);
     try {
       const { error: projectError } = await supabase
@@ -438,6 +489,8 @@ export default function FormBuilder() {
           form_title: formTitle.trim() || project.project_name,
           form_description: formDescription.trim() || null,
           form_header_image_url: formHeaderImageUrl,
+          auto_close_at: fromDateTimeLocal(autoCloseAt),
+          max_submissions: limit,
           email_notifications_enabled: isElite
             ? emailNotifications
             : Boolean(project.email_notifications_enabled),
@@ -489,6 +542,8 @@ export default function FormBuilder() {
           emailNotifications,
           emailSenderName,
           photoRequired,
+          autoCloseAt,
+          maxSubmissions,
           labelled,
         ),
       );
@@ -511,6 +566,13 @@ export default function FormBuilder() {
   }
 
   if (!project) return null;
+
+  const limitValue = maxSubmissions.trim() ? Number(maxSubmissions) : null;
+  const closeMoment = fromDateTimeLocal(autoCloseAt);
+  const closesNow =
+    project.status !== 'active' ||
+    (closeMoment !== null && new Date(closeMoment).getTime() <= Date.now()) ||
+    (limitValue !== null && Number.isFinite(limitValue) && submissionCount >= limitValue);
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -700,6 +762,67 @@ export default function FormBuilder() {
               </div>
             </div>
           )}
+
+          <div className="mt-7 border-t border-foreground/10 pt-6">
+            <Label className="mono-label flex flex-wrap items-center gap-2 text-foreground/45">
+              <CalendarClock className="h-3.5 w-3.5" /> Closing the form
+            </Label>
+            <p className="mt-2 max-w-sm text-xs leading-relaxed text-foreground/50">
+              Stop collecting responses automatically. Leave both empty to stay open.
+            </p>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="autoCloseAt" className="text-xs text-foreground/55">
+                  Close on a date
+                </Label>
+                <Input
+                  id="autoCloseAt"
+                  type="datetime-local"
+                  value={autoCloseAt}
+                  onChange={(e) => setAutoCloseAt(e.target.value)}
+                  className={fieldClass}
+                />
+                {autoCloseAt && (
+                  <button
+                    type="button"
+                    onClick={() => setAutoCloseAt('')}
+                    className="text-[11px] text-foreground/40 underline-offset-4 hover:text-foreground hover:underline"
+                  >
+                    Clear the date
+                  </button>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="maxSubmissions" className="text-xs text-foreground/55">
+                  Close after responses
+                </Label>
+                <Input
+                  id="maxSubmissions"
+                  type="number"
+                  min={1}
+                  inputMode="numeric"
+                  value={maxSubmissions}
+                  onChange={(e) => setMaxSubmissions(e.target.value)}
+                  placeholder="No limit"
+                  className={fieldClass}
+                />
+                <p className="text-[11px] leading-relaxed text-foreground/40">
+                  {submissionCount} collected so far
+                  {limitValue !== null && Number.isFinite(limitValue)
+                    ? ` · ${Math.max(0, limitValue - submissionCount)} left`
+                    : ''}
+                </p>
+              </div>
+            </div>
+
+            {closesNow && (
+              <p className="mt-4 rounded-xl border border-foreground/10 bg-lilac/30 px-4 py-3 text-[11px] leading-relaxed text-foreground/55">
+                With these settings the public form is closed right now. Save to apply, or clear a
+                limit to reopen it.
+              </p>
+            )}
+          </div>
 
           <div className="mt-7 border-t border-foreground/10 pt-6">
             <div className="flex items-start justify-between gap-4">

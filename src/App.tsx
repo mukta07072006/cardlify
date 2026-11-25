@@ -19,6 +19,7 @@ import Pricing from "./pages/Pricing";
 import EliteAdmin from "./pages/EliteAdmin";
 import Templates from "./pages/Templates";
 import LovelyPeoples from "./pages/lovelyPeople";
+import ProjectViewer from "./pages/ProjectViewer";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/project/:projectId" element={<ProjectDetails />} />
             <Route path="/project/:projectId/editor" element={<TemplateEditor />} />
             <Route path="/project/:projectId/forms" element={<FormBuilder />} />
+            <Route path="/project/:projectId/viewer" element={<ProjectViewer />} />
             <Route path="/submit/:projectId" element={<SubmissionForm />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/templates" element={<Templates />} />

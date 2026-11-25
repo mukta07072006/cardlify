@@ -4,3 +4,7 @@ project_id = "iqnzfxtfqxksctddjrhk"
 # sends at most once per submission, so the gateway does not require a JWT.
 [functions.send-submission-email]
 verify_jwt = false
+
+# Only a signed-in project owner may invite a viewer, so the gateway keeps JWT verification on.
+[functions.invite-project-viewer]
+verify_jwt = true
