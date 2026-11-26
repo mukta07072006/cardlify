@@ -8,6 +8,7 @@ type SubscriptionTier = 'free' | 'elite';
 interface UserRoleData {
   role: AppRole | null;
   subscriptionTier: SubscriptionTier;
+  eliteExpiryDate: string | null;
   isAdmin: boolean;
   isElite: boolean;
   loading: boolean;
@@ -17,12 +18,14 @@ export function useUserRole(): UserRoleData {
   const { user } = useAuth();
   const [role, setRole] = useState<AppRole | null>(null);
   const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('free');
+  const [eliteExpiryDate, setEliteExpiryDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) {
       setRole(null);
       setSubscriptionTier('free');
+      setEliteExpiryDate(null);
       setLoading(false);
       return;
     }
@@ -43,12 +46,18 @@ export function useUserRole(): UserRoleData {
         // Fetch subscription tier from profile
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('subscription_tier')
+          .select('subscription_tier, elite_expiry_date')
           .eq('user_id', user.id)
           .maybeSingle();
 
         if (profileData) {
-          setSubscriptionTier(profileData.subscription_tier as SubscriptionTier);
+          const expiry = profileData.elite_expiry_date ?? null;
+          const active =
+            profileData.subscription_tier === 'elite' &&
+            (!expiry || new Date(expiry).getTime() > Date.now());
+
+          setSubscriptionTier(active ? 'elite' : 'free');
+          setEliteExpiryDate(active ? expiry : null);
         }
       } catch (error) {
         console.error('Error fetching user role:', error);
@@ -63,6 +72,7 @@ export function useUserRole(): UserRoleData {
   return {
     role,
     subscriptionTier,
+    eliteExpiryDate,
     isAdmin: role === 'admin',
     isElite: subscriptionTier === 'elite',
     loading,

@@ -39,18 +39,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string, name: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          name: name
-        }
-      }
+    // The confirmation email is sent by Cardlify itself so it can be branded and
+    // come from admin@cardlify.site; the function still asks Supabase for the link.
+    const { data, error } = await supabase.functions.invoke('send-signup-email', {
+      body: { email, password, name },
     });
+
+    if (!error) {
+      if (data && typeof data === 'object' && 'error' in data && data.error) {
+        return { error: new Error(String(data.error)) };
+      }
+      return { error: null };
+    }
+
+    try {
+      const context = (error as { context?: Response }).context;
+      if (context && typeof context.json === 'function') {
+        const payload = await context.json();
+        if (payload?.error) return { error: new Error(String(payload.error)) };
+      }
+    } catch {
+      // Fall through to the original error when the body cannot be read.
+    }
+
     return { error };
   };
 

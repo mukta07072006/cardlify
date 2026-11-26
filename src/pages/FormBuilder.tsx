@@ -10,14 +10,6 @@ import { Eyebrow, Wordmark } from '@/components/studio';
 import { RichText } from '@/components/RichText';
 import { fromDateTimeLocal, toDateTimeLocal } from '@/lib/formWindow';
 import { useUserRole } from '@/hooks/useUserRole';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import {
   createEmptyField,
@@ -37,7 +29,6 @@ import {
   ImagePlus,
   LayoutTemplate,
   Loader2,
-  Lock,
   Plus,
   Save,
   Sparkles,
@@ -132,7 +123,6 @@ export default function FormBuilder() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedSignature, setSavedSignature] = useState('');
-  const [eliteDialogOpen, setEliteDialogOpen] = useState(false);
 
   /** Wraps the selected intro text in ** so it renders bold on the submit page. */
   const toggleDescriptionBold = () => {
@@ -491,12 +481,8 @@ export default function FormBuilder() {
           form_header_image_url: formHeaderImageUrl,
           auto_close_at: fromDateTimeLocal(autoCloseAt),
           max_submissions: limit,
-          email_notifications_enabled: isElite
-            ? emailNotifications
-            : Boolean(project.email_notifications_enabled),
-          email_sender_name: isElite
-            ? emailSenderName.trim() || project.project_name
-            : project.email_sender_name,
+          email_notifications_enabled: emailNotifications,
+          email_sender_name: emailSenderName.trim() || project.project_name,
           photo_required: photoRequired,
         })
         .eq('id', project.id);
@@ -834,11 +820,11 @@ export default function FormBuilder() {
                   Confirmation email
                   <span
                     className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] ${
-                      isElite ? 'bg-lime/60 text-foreground/60' : 'bg-foreground/10 text-foreground/45'
+                      isElite ? 'bg-lime/60 text-foreground/60' : 'bg-lilac/60 text-foreground/55'
                     }`}
                   >
-                    {isElite ? <Sparkles className="h-2.5 w-2.5" /> : <Lock className="h-2.5 w-2.5" />}
-                    {isElite ? 'Elite' : 'Locked'}
+                    <Sparkles className="h-2.5 w-2.5" />
+                    {isElite ? 'Elite' : 'First 100 free'}
                   </span>
                 </Label>
                 <p className="mt-2 max-w-sm text-xs leading-relaxed text-foreground/50">
@@ -847,33 +833,20 @@ export default function FormBuilder() {
                 </p>
                 {!isElite && (
                   <p className="mt-2 max-w-sm text-xs leading-relaxed text-foreground/40">
-                    Confirmation emails are an Elite feature. Upgrade to switch them on for this
-                    form.
+                    Free projects include this for the first 100 registrations. After that, Elite
+                    keeps it on for every response.
                   </p>
                 )}
               </div>
-              {isElite ? (
-                <Switch
-                  id="emailNotifications"
-                  checked={emailNotifications}
-                  onCheckedChange={setEmailNotifications}
-                  className="mt-1"
-                />
-              ) : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-1 shrink-0 rounded-full"
-                  onClick={() => setEliteDialogOpen(true)}
-                >
-                  <Lock className="mr-1.5 h-3.5 w-3.5" />
-                  Locked
-                </Button>
-              )}
+              <Switch
+                id="emailNotifications"
+                checked={emailNotifications}
+                onCheckedChange={setEmailNotifications}
+                className="mt-1"
+              />
             </div>
 
-            {isElite && emailNotifications && (
+            {emailNotifications && (
               <div className="mt-5 space-y-2 rounded-2xl border border-foreground/10 bg-background/40 p-4">
                 <Label htmlFor="emailSenderName" className="mono-label text-foreground/45">
                   Sender name
@@ -1036,41 +1009,6 @@ export default function FormBuilder() {
         </div>
       </main>
 
-      <Dialog open={eliteDialogOpen} onOpenChange={setEliteDialogOpen}>
-        <DialogContent className="max-w-md rounded-3xl border-foreground/10">
-          <DialogHeader>
-            <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-lilac/70">
-              <Lock className="h-5 w-5 text-foreground/60" />
-            </div>
-            <DialogTitle className="display-md mt-3 text-center">
-              Confirmation emails are Elite
-            </DialogTitle>
-            <DialogDescription className="text-center text-sm leading-relaxed text-foreground/55">
-              Go Elite to send every submitter a branded email with their serial code, using your
-              own sender name and no Cardlify watermark.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-2 flex-col gap-2 sm:flex-col">
-            <Button
-              className="w-full rounded-full"
-              onClick={() => {
-                setEliteDialogOpen(false);
-                navigate('/pricing');
-              }}
-            >
-              <Sparkles className="mr-1.5 h-4 w-4" />
-              Become Elite
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full rounded-full"
-              onClick={() => setEliteDialogOpen(false)}
-            >
-              Not now
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

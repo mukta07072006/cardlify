@@ -78,7 +78,7 @@ export default function Auth() {
         if (error) {
           toast.error(error.message);
         } else {
-          toast.success('Account created — check your inbox');
+          toast.success('Account created — confirm your email to sign in');
           setIsLogin(true);
         }
       }

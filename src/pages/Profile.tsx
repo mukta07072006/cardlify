@@ -28,7 +28,7 @@ interface ProfileData {
 
 export default function Profile() {
   const { user, authLoading } = useAuth();
-  const { isElite, loading: roleLoading } = useUserRole();
+  const { isElite, eliteExpiryDate, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -36,6 +36,14 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editName, setEditName] = useState('');
+
+  const eliteUntil = eliteExpiryDate
+    ? new Date(eliteExpiryDate).toLocaleDateString(undefined, {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : null;
 
   useEffect(() => {
     if (!authLoading && !user) navigate('/auth');
@@ -142,8 +150,10 @@ export default function Profile() {
 
             <p className={`mt-8 text-sm leading-relaxed ${isElite ? 'text-paper/60' : 'text-foreground/50'}`}>
               {isElite
-                ? 'Unlimited projects and generations are unlocked on this account.'
-                : 'One active project and 100 card generations on the free plan.'}
+                ? eliteUntil
+                  ? `Elite is active until ${eliteUntil} — unlimited projects, generations and a confirmation email for every response.`
+                  : 'Unlimited projects and generations are unlocked on this account.'
+                : 'One active project and 100 card generations on the free plan. Your first month of Elite is free.'}
             </p>
 
             <div className={`mt-6 flex items-baseline gap-3 border-t pt-6 ${isElite ? 'border-paper/10' : 'border-foreground/10'}`}>
@@ -156,7 +166,7 @@ export default function Profile() {
             {!isElite && (
               <Button className="mt-6 w-full" onClick={() => navigate('/pricing')}>
                 <Crown className="h-4 w-4" />
-                Upgrade membership
+                Get 1 month free Elite
                 <ArrowUpRight className="h-4 w-4" />
               </Button>
             )}

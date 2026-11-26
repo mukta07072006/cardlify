@@ -171,6 +171,8 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          elite_expiry_date: string | null
+          elite_trial_started_at: string | null
           email: string
           id: string
           name: string
@@ -179,6 +181,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          elite_expiry_date?: string | null
+          elite_trial_started_at?: string | null
           email: string
           id?: string
           name: string
@@ -187,6 +191,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          elite_expiry_date?: string | null
+          elite_trial_started_at?: string | null
           email?: string
           id?: string
           name?: string
@@ -390,6 +396,10 @@ export type Database = {
       }
     }
     Functions: {
+      claim_elite_trial: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_project_availability: {
         Args: { _project_id: string }
         Returns: Json

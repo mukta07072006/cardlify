@@ -24,7 +24,6 @@ import {
   FileSpreadsheet,
   FileText,
   ClipboardList,
-  Lock,
   Mail,
   ShieldCheck,
   Sparkles,
@@ -733,42 +732,32 @@ export default function ProjectDetails() {
                   Confirmation email
                   <span
                     className={`mono-label inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] ${
-                      isElite ? 'bg-lime/60 text-foreground/60' : 'bg-foreground/10 text-foreground/45'
+                      isElite ? 'bg-lime/60 text-foreground/60' : 'bg-lilac/60 text-foreground/55'
                     }`}
                   >
-                    {isElite ? <Sparkles className="h-2.5 w-2.5" /> : <Lock className="h-2.5 w-2.5" />}
-                    {isElite ? (project?.email_notifications_enabled ? 'On' : 'Off') : 'Elite only'}
+                    <Sparkles className="h-2.5 w-2.5" />
+                    {project?.email_notifications_enabled ? 'On' : 'Off'}
                   </span>
                 </p>
                 <p className="mt-1 max-w-xl text-xs leading-relaxed text-foreground/45">
-                  {isElite
-                    ? project?.email_notifications_enabled
-                      ? `Submitters receive a branded email from “${
-                          project?.email_sender_name || project?.project_name
-                        }” with their serial code.`
-                      : 'Turn it on in the form settings to email every submitter their serial code.'
-                    : 'Submitters can receive a branded email with their serial code. This is an Elite feature.'}
+                  {project?.email_notifications_enabled
+                    ? `Submitters receive a branded email from “${
+                        project?.email_sender_name || project?.project_name
+                      }” with their serial code.`
+                    : isElite
+                      ? 'Turn it on in the form settings to email every submitter their serial code.'
+                      : 'Turn it on in the form settings — free projects email the first 100 registrations.'}
                 </p>
               </div>
             </div>
-            {isElite ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0 rounded-full"
-                onClick={() => navigate(`/project/${projectId}/forms`)}
-              >
-                Email settings
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                className="shrink-0 rounded-full"
-                onClick={() => navigate('/pricing')}
-              >
-                <Lock className="mr-1.5 h-3.5 w-3.5" /> Unlock with Elite
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 rounded-full"
+              onClick={() => navigate(`/project/${projectId}/forms`)}
+            >
+              Email settings
+            </Button>
           </div>
         )}
 
